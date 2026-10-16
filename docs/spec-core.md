@@ -14,8 +14,10 @@
 
 ## 2. Exact 7-Player Avalon Rules Engine
 
-### 2.1 Role Distribution (Strictly Random Every Game)
-At the start of every new game, the 7 secret roles are cryptographically shuffled (`crypto.randomInt` / Fisher-Yates) across the **6 AI Idols + 1 Human Player**. There is **no manual role selection** in standard play.
+### 2.1 Role Selection & Distribution (Player Role Choice + Cryptographic Shuffle of Remaining 6 Roles)
+At the start of a game, the **Human Player** can freely choose which role they want to play (`Merlin`, `Percival`, `Loyal Servant`, `Assassin`, `Morgana`, `Oberon`, or `Random`). Once the Human Player's role is assigned, the **remaining 6 roles** from the official 7-player deck are cryptographically shuffled (`crypto.randomInt` / Fisher-Yates) across the **6 AI Idols**:
+- **Player Epistemic Blindness**: The Human Player has **zero knowledge** of how the remaining 6 roles were distributed among the 6 AI Idols, *except* for what their chosen role legally sees during the Night Phase (e.g., Merlin sees which 3 idols are Evil; Percival sees 2 Merlin/Morgana candidates; Assassin/Morgana sees their 1 Evil partner; Loyal Servant and Oberon see nobody).
+- **AI Epistemic Blindness**: None of the 6 AI Idols (nor MC Jae-suk) know what role the Human Player selected, *except* when an AI Idol's own legitimate Night Phase role grants that sight according to official Avalon rules (e.g., an AI Merlin sees if the Human is Evil; an AI Assassin/Morgana sees if the Human is their Evil partner).
 
 | Alignment | Role Name | Count | Night Phase Epistemic Knowledge (Strict Isolation) | Win Condition & Special Rules |
 | :--- | :--- | :---: | :--- | :--- |

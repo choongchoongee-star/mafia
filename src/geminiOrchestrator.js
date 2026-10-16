@@ -336,7 +336,8 @@ Return ONLY valid JSON:
   const ttsPayload = await synthesizeSpeechTTS({
     speakerId: 'mc_jaesuk',
     voiceName: MC_HOST_PROFILE.voiceName,
-    text
+    text,
+    skipTts: Boolean(game?.skipTts)
   });
 
   return {

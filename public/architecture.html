@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDOL AVALON LIVE — Interactive System Architecture & Verification Walkthrough</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #090b12;
+      --panel: #111524;
+      --card: #161b2e;
+      --border: rgba(255, 255, 255, 0.1);
+      --pink: #ec4899;
+      --indigo: #6366f1;
+      --cyan: #06b6d4;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #f43f5e;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 15% 0%, #171c36 0%, #090b12 70%);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.55;
+      padding-bottom: 60px;
+    }
+    header {
+      background: rgba(13, 17, 30, 0.92);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(12px);
+    }
+    .brand h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: linear-gradient(135deg, var(--pink), var(--indigo));
+      padding: 3px 9px;
+      border-radius: 6px;
+    }
+    .back-btn {
+      background: linear-gradient(135deg, var(--pink), var(--indigo));
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 9px 16px;
+      border-radius: 8px;
+    }
+    .container {
+      max-width: 1220px;
+      margin: 28px auto;
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .section-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .section-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--pink);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      margin: 4px 0 14px 0;
+    }
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .model-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .model-box:hover {
+      transform: translateY(-2px);
+      border-color: var(--pink);
+    }
+    .model-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #6ee7b7;
+      background: rgba(16, 185, 129, 0.14);
+      padding: 3px 8px;
+      border-radius: 5px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+    .model-box h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+    .model-box p {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .pipeline-flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .flow-step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--indigo);
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+    }
+    .flow-step.active {
+      border-color: var(--pink);
+      background: rgba(236, 72, 153, 0.12);
+    }
+    .flow-step .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .flow-step h4 {
+      font-size: 14px;
+      margin: 4px 0;
+    }
+    .flow-step p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .inspector-box {
+      margin-top: 16px;
+      background: #0b0e19;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+    }
+    .epistemic-selector {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .role-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .role-btn.active {
+      background: linear-gradient(135deg, var(--pink), var(--indigo));
+      border-color: transparent;
+    }
+    .video-preview-strip {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .mini-cam {
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .mini-cam video {
+      width: 100%;
+      height: 110px;
+      object-fit: cover;
+      display: block;
+    }
+    .mini-cam span {
+      display: block;
+      padding: 5px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #0d1220;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>IDOL AVALON LIVE <span class="badge">ARCHITECTURE &amp; VERIFICATION WALKTHROUGH</span></h1>
+    </div>
+    <a href="/" class="back-btn">🎥 Return to Live Zoom Studio</a>
+  </header>
+
+  <main class="container">
+    <!-- Section 1: Live Webcam Assets Preview -->
+    <section class="section-card">
+      <span class="section-eyebrow">1. REAL-TIME MULTIMODAL STUDIO FEEDS</span>
+      <h2>7 Native `.mp4` Studio Webcam Streams (`gemini-omni-1.1-flash`) + 4K Portraits (`gemini-nano-banana-2.1`)</h2>
+      <p style="color:var(--muted); font-size:13.5px;">
+        Every character in the broadcast studio runs an authentic `.mp4` webcam video loop generated via <code>gemini-omni-1.1-flash</code> (`background: true`) layered underneath a 60FPS transparent HTML5 Canvas HUD that tracks phoneme visemes, autofocus brackets, and simultaneous listener reactions.
+      </p>
+      <div class="video-preview-strip">
+        <div class="mini-cam"><video src="/generated/webcam_mc_jaesuk.mp4" poster="/generated/portrait_mc_jaesuk.png" autoplay loop muted playsinline></video><span>MC Jae-suk</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_wonyoung.mp4" poster="/generated/portrait_idol_wonyoung.png" autoplay loop muted playsinline></video><span>Wonyoung</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_karina.mp4" poster="/generated/portrait_idol_karina.png" autoplay loop muted playsinline></video><span>Karina</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_sullyoon.mp4" poster="/generated/portrait_idol_sullyoon.png" autoplay loop muted playsinline></video><span>Sullyoon</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_yuna.mp4" poster="/generated/portrait_idol_yuna.png" autoplay loop muted playsinline></video><span>Yuna</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_chaewon.mp4" poster="/generated/portrait_idol_chaewon.png" autoplay loop muted playsinline></video><span>Chaewon</span></div>
+        <div class="mini-cam"><video src="/generated/webcam_idol_hanni.mp4" poster="/generated/portrait_idol_hanni.png" autoplay loop muted playsinline></video><span>Hanni</span></div>
+      </div>
+    </section>
+
+    <!-- Section 2: Interactive Turn & Verification Pipeline -->
+    <section class="section-card">
+      <span class="section-eyebrow">2. CLOSED-LOOP VERIFICATION &amp; MULTI-AGENT PIPELINE</span>
+      <h2>Click Any Stage to Inspect the Exact `gemini-4-argon` Interactions API Payload</h2>
+      <div class="pipeline-flow" id="pipelineSteps">
+        <div class="flow-step active" data-step="0">
+          <span class="step-num">STAGE 01</span>
+          <h4>Epistemic Partition</h4>
+          <p><code>buildPrivatePlayerView()</code> strips unrevealed roles so no agent can cheat.</p>
+        </div>
+        <div class="flow-step" data-step="1">
+          <span class="step-num">STAGE 02</span>
+          <h4>Argon Dual-Channel</h4>
+          <p><code>gemini-4-argon</code> generates <code>privateInnerThought</code> + <code>publicSpeech</code>.</p>
+        </div>
+        <div class="flow-step" data-step="2">
+          <span class="step-num">STAGE 03</span>
+          <h4>Verification &amp; Heal</h4>
+          <p><code>verifyAndHealUtterance()</code> blocks role leaks &amp; heals rule errors.</p>
+        </div>
+        <div class="flow-step" data-step="3">
+          <span class="step-num">STAGE 04</span>
+          <h4>Parallel Flash Vote</h4>
+          <p><code>gemini-3.8-flash</code> resolves all 6 AI Idol votes concurrently.</p>
+        </div>
+        <div class="flow-step" data-step="4">
+          <span class="step-num">STAGE 05</span>
+          <h4>Multimodal Synthesis</h4>
+          <p><code>gemini-3.8-flash-tts</code> WAV voice + <code>lyria-3.5</code> adaptive BGM.</p>
+        </div>
+      </div>
+      <div class="inspector-box" id="pipelineInspector"></div>
+    </section>
+
+    <!-- Section 3: Interactive Epistemic Matrix Explorer -->
+    <section class="section-card">
+      <span class="section-eyebrow">3. EPISTEMIC ISOLATION EXPLORER</span>
+      <h2>Inspect What Each Secret Avalon Role Is Permitted to Know (`buildPrivatePlayerView`)</h2>
+      <div class="epistemic-selector" id="roleButtons">
+        <button class="role-btn active" data-role="MERLIN">🧙‍♂️ MERLIN (Good)</button>
+        <button class="role-btn" data-role="PERCIVAL">🛡️ PERCIVAL (Good)</button>
+        <button class="role-btn" data-role="LOYAL_SERVANT">⚔️ LOYAL SERVANT (Good)</button>
+        <button class="role-btn" data-role="ASSASSIN">🗡️ ASSASSIN (Evil)</button>
+        <button class="role-btn" data-role="MORGANA">🔮 MORGANA (Evil)</button>
+        <button class="role-btn" data-role="OBERON">👁️ OBERON (Evil Blind)</button>
+      </div>
+      <div class="inspector-box" id="roleInspector"></div>
+    </section>
+
+    <!-- Section 4: Model Ecosystem Grid -->
+    <section class="section-card">
+      <span class="section-eyebrow">4. GOOGLE DEEPMIND MODEL STACK</span>
+      <h2>7 Specialized Models Orchestrated via `@google/genai` Interactions API</h2>
+      <div class="model-grid">
+        <div class="model-box">
+          <span class="model-id">gemini-4-argon</span>
+          <h3>Showrunner, Deduction &amp; Verifier</h3>
+          <p>Drives AI Leader proposals (<code>thinking_level: "high"</code>), idol deception (<code>"medium"</code>), MC Jae-suk hosting (<code>"low"</code>), and the self-healing verification loop. Zero legacy sampling params.</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">gemini-3.8-flash</span>
+          <h3>Parallel 6-Idol Vote Engine</h3>
+          <p>Executes simultaneous <code>APPROVE</code> / <code>REJECT</code> team votes across all 6 AI Idols in parallel with sub-second turnarounds.</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">gemini-omni-1.1-flash</span>
+          <h3>Live Studio Webcam Video (`.mp4`)</h3>
+          <p>Generates 16:9 studio webcam video feeds via asynchronous background interactions (<code>background: true</code>) polled via <code>ai.interactions.get(id)</code>.</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">gemini-nano-banana-2.1</span>
+          <h3>4K Studio Portrait Anchors</h3>
+          <p>Produces high-resolution photorealistic studio portraits for MC Jae-suk and all 6 K-Pop Idols.</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">gemini-3.8-flash-tts</span>
+          <h3>Expressive English Voice Synthesis</h3>
+          <p>Synthesizes real-time <code>audio/wav</code> character speech that drives the 60FPS phoneme/viseme HUD and audio waveform bars.</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">lyria-3.5 / lyria-3-clip-preview</span>
+          <h3>Phase-Adaptive Broadcast BGM</h3>
+          <p>Dynamically generates and switches instrumental tension loops across Discussion, Vote, Quest Execution, and Assassin Climax phases.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const PIPELINE_SNIPPETS = [
+`// STAGE 01: Strict Epistemic Isolation (src/avalonEngine.js)
+const privateView = buildPrivatePlayerView(game, speaker.id);
+// Returns ONLY:
+// - privateView.self: { id, name, roleId, roleName, alignment }
+// - privateView.epistemicVision: { knownEvilIds, merlinCandidateIds, nightVisionText }
+// - privateView.suspicionLedger: Bayesian suspicion scores (0..100) derived from public votes & quest fails`,
+`// STAGE 02: Gemini 4 Argon Dual-Channel Reasoning (src/geminiOrchestrator.js)
+const response = await ai.interactions.create({
+  model: 'gemini-4-argon',
+  input: prompt,
+  generation_config: {
+    thinking_level: 'medium' // NEVER pass thinking_budget, temperature, top_p, top_k, or cached_content
+  }
+});
+// Outputs JSON: { privateInnerThought, publicSpeech, expression, accusedPlayerId }`,
+`// STAGE 03: Closed-Loop Epistemic & Rule Verification (verifyAndHealUtterance)
+// 1. Deterministic audit checks for:
+//    - Merlin self-reveal leak ("I am Merlin" / "my night vision")
+//    - Good player claiming Evil alignment
+//    - Hallucinated Quest numbers or team sizes
+// 2. If flagged, gemini-4-argon (thinking_level="medium") rewrites the utterance in-character before emission!`,
+`// STAGE 04: Parallel 6-Idol Vote Resolution (gemini-3.8-flash)
+const votePromises = aiPlayers.map((idol) =>
+  generateIdolVoteDecision(game, idol.id) // Runs concurrently via Promise.all
+);
+const decisions = await Promise.all(votePromises);`,
+`// STAGE 05: Multimodal Broadcast Output
+// - Voice: gemini-3.8-flash-tts returns base64 RIFF audio/wav
+// - Video: gemini-omni-1.1-flash .mp4 stream reacts with scale/playbackRate modulation
+// - Music: lyria-3-clip-preview adapts studio BGM to current game phase`
+    ];
+
+    const ROLE_SNIPPETS = {
+      MERLIN: `Role: MERLIN (Loyal Servant of Arthur — GOOD)
+Epistemic Vision:
+- Sees all 3 Evil players (ASSASSIN, MORGANA, OBERON) with 👁️ EVIL badges.
+- Strategic Constraint: Must subtly steer Good players away from Evil teams WITHOUT exposing Merlin's identity to the Assassin!
+- Verification Rule: verifyAndHealUtterance() blocks any explicit "I am Merlin" leak.`,
+      PERCIVAL: `Role: PERCIVAL (Loyal Servant of Arthur — GOOD)
+Epistemic Vision:
+- Sees 2 players tagged as 🔮 MERLIN / MORGANA? (one is true Merlin, one is Morgana).
+- Strategic Goal: Deduce which of the two candidates is truly Merlin by cross-referencing their votes against failed Quests, and protect true Merlin from the Assassin.`,
+      LOYAL_SERVANT: `Role: LOYAL SERVANT OF ARTHUR (Citizen — GOOD)
+Epistemic Vision:
+- Sees 0 secret role tags during Night Phase.
+- Strategic Goal: Rely on pure voting matrix analysis, Quest fail counts (remembering Quest 4 requires 2 Fails!), and Bystander behavioral cues.`,
+      ASSASSIN: `Role: THE ASSASSIN (Minion of Mordred — EVIL)
+Epistemic Vision:
+- Knows MORGANA as an Evil partner (does NOT see OBERON).
+- Strategic Goal: Sabotage 3 Quests OR, even if Good passes 3 Quests, observe which Good player has unnatural knowledge of Evil and assassinate MERLIN in the final phase!`,
+      MORGANA: `Role: MORGANA (Minion of Mordred — EVIL)
+Epistemic Vision:
+- Knows ASSASSIN as an Evil partner (does NOT see OBERON).
+- Appears to PERCIVAL as a Merlin candidate.
+- Strategic Goal: Impersonate Merlin's wisdom to win Percival's trust and sneak onto Quest teams.`,
+      OBERON: `Role: OBERON (Blind Wildcard — EVIL)
+Epistemic Vision:
+- Sees 0 Evil teammates (and Assassin/Morgana do NOT see Oberon), though MERLIN still sees Oberon as Evil.
+- Strategic Goal: Cause chaos on Quest teams and deduce who Assassin and Morgana are from public voting patterns.`
+    };
+
+    const stepEls = document.querySelectorAll('.flow-step');
+    const pipeInspector = document.getElementById('pipelineInspector');
+    pipeInspector.textContent = PIPELINE_SNIPPETS[0];
+    stepEls.forEach((el) => {
+      el.addEventListener('click', () => {
+        stepEls.forEach((s) => s.classList.remove('active'));
+        el.classList.add('active');
+        pipeInspector.textContent = PIPELINE_SNIPPETS[Number(el.dataset.step)];
+      });
+    });
+
+    const roleBtns = document.querySelectorAll('.role-btn');
+    const roleInspector = document.getElementById('roleInspector');
+    roleInspector.textContent = ROLE_SNIPPETS.MERLIN;
+    roleBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        roleBtns.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        roleInspector.textContent = ROLE_SNIPPETS[btn.dataset.role];
+      });
+    });
+  </script>
+</body>
+</html>

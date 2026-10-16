@@ -24,6 +24,7 @@ const state = {
   selectedProposalIds: new Set(),
   selectedTargetMemberId: '',
   activeSpeakerId: null,
+  activeClashYielderId: null,
   activeSpeechText: '',
   activeSpeechStartTime: 0,
   activeSpeechEndTime: 0,
