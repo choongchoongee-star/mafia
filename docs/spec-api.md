@@ -84,12 +84,12 @@ To guarantee **zero cheating** and **genuine high-level Avalon play**, the backe
 ## 4. REST & Streaming API Endpoints
 
 ### 4.1 `POST /api/game/new`
-Starts a new 7-player Avalon game with cryptographically randomized roles across the 6 AI Idols + 1 Human Player.
+Starts a new 7-player Avalon game with cryptographically randomized roles across the 6 AI Idols + 1 Human Player (or assigns the Human Player's optional preferred role for demo testing while randomizing the remaining 6 roles across the AI Idols).
 - **Request Body**:
   ```json
   {
     "playerName": "Guest",
-    "demoPreset": "STANDARD" // Optional for Judge 3-min test: "STANDARD" | "QUEST_4_CRITICAL" | "ASSASSIN_CLIMAX"
+    "preferredRole": "RANDOM" // "RANDOM" | "MERLIN" | "PERCIVAL" | "LOYAL_SERVANT" | "ASSASSIN" | "MORGANA" | "OBERON"
   }
   ```
 - **Response (`200 OK`)**:

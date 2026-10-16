@@ -131,15 +131,15 @@ stateDiagram-v2
 
 ## 5. Multimodal Video, Voice & Verification Architecture
 
-### 5.1 Live Idol Video & Speech Generation Pipeline
-1. **Photorealistic Visual Anchor (`gemini-nano-banana-2.1` / `gemini-3.1-flash-lite-image`)**:
-   - Generates high-resolution, photorealistic webcam portraits for **MC Jae-suk** and all **6 Idols** across key emotional expressions (`neutral_listening`, `speaking_confident`, `shocked_accused`, `suspicious_glare`, `happy_victory`), cached locally on disk/memory so Zoom tiles render instantaneously at 60 FPS.
-2. **Live Generative Video Clips (`gemini-omni-1.1-flash`)**:
-   - Triggered with `background=True` for live turn responses and dramatic highlights (Leader Proposal speech, Accusation Spotlight, Quest Reveal reaction, Assassin Final Shot).
-   - Uses **Pipelined Pre-Buffering**: while the current speaker's audio/video is playing on the Zoom spotlight, the next scheduled speaker's LLM dialogue + media generation is already executing in the background.
+### 5.1 Live Idol Webcam Video & Speech Generation Pipeline
+1. **Real Looping Webcam Video Streams (`gemini-omni-1.1-flash`)**:
+   - Generates real 16:9 `.mp4` broadcast studio webcam videos (`output_video.data` via Interactions API `background=True`) for **MC Jae-suk** and all **6 Idols** (`webcam_<characterId>.mp4`), playing continuously inside `<video autoplay loop muted playsinline>` elements in every Zoom tile.
+   - Triggered with `background=True` for both pre-warmed studio webcam loops and live turn reactions (Leader Proposal speech, Accusation Spotlight, Quest Reveal reaction, Assassin Final Shot).
+2. **Photorealistic Visual Anchor (`gemini-nano-banana-2.1` / `gemini-3.1-flash-lite-image`)**:
+   - Generates high-resolution 4K studio webcam poster frames (`portrait_<characterId>.png`) cached locally on disk (`/public/generated/`) for instant 0ms poster display while video streams initialize.
 3. **Expressive Real-Time Speech (`gemini-3.8-flash-tts`) + Audio-Reactive Webcam Engine**:
    - Every spoken line is synthesized with member-specific voice profiles via `gemini-3.8-flash-tts` (`gemini-3.8-flash-lite-tts` for ultra-low latency).
-   - Simultaneously drives a **WebGL / Canvas 2.5D Photorealistic Webcam Animator** (micro head movement, natural eye blinking, audio-frequency-synchronized mouth/jaw articulation, live ring-light reflection, "LIVE HD" broadcast overlay, and speaking border glow) so even when a full `gemini-omni-1.1-flash` video clip is still rendering in the background, the idol's photorealistic webcam feed speaks and moves lifelike with **< 1.5s latency**.
+   - Simultaneously drives audio-reactive camera motion, speaking border glow, live voice waveform overlays, and HUD telemetry over the live `<video>` webcam stream.
 4. **Adaptive Soundtrack (`lyria-3.5` / `lyria-3-clip-preview`)**:
    - Generates dynamic background music loops matching the game tension (Upbeat K-Pop Variety Show BGM $\rightarrow$ Tense Social Deduction Interrogation $\rightarrow$ High-Stakes Assassin Climax).
 
