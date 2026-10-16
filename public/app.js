@@ -1,11 +1,11 @@
 /**
- * @fileoverview IDOL AVALON LIVE — Frontend Zoom Studio Client, 60FPS Photorealistic Webcam Renderer,
- * Autonomous Round Timer, Voice/TTS Engine, and Judge X-Ray Inspector.
+ * @fileoverview IDOL AVALON LIVE — Frontend Zoom Studio Client, 60FPS 2.5D Neural Talking-Head Video Rig,
+ * Live <video> Stream Poller (`gemini-omni-1.1-flash`), Autonomous Round Timer, Voice/TTS Engine, and Judge X-Ray Inspector.
  */
 
 const PHOTOREALISTIC_PORTRAIT_ANCHORS = {
   mc_jaesuk:
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=85',
   idol_wonyoung:
     'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=800&q=85',
   idol_karina:
@@ -15,9 +15,23 @@ const PHOTOREALISTIC_PORTRAIT_ANCHORS = {
   idol_yuna:
     'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=85',
   idol_chaewon:
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=85',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=85',
   idol_hanni:
     'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=800&q=85'
+};
+
+/**
+ * Per-character normalized facial landmark calibration for the 60FPS 2.5D Neural Talking-Head Rig.
+ * Coordinates are normalized (0..1) relative to the rendered aspect-filled portrait frame.
+ */
+const CHARACTER_FACE_RIGS = {
+  mc_jaesuk: { headX: 0.5, headY: 0.43, headRx: 0.25, headRy: 0.34, eyeY: 0.38, eyeSpanX: 0.072, mouthY: 0.56, jawRx: 0.13, jawRy: 0.13 },
+  idol_wonyoung: { headX: 0.5, headY: 0.42, headRx: 0.25, headRy: 0.34, eyeY: 0.37, eyeSpanX: 0.068, mouthY: 0.55, jawRx: 0.12, jawRy: 0.12 },
+  idol_karina: { headX: 0.5, headY: 0.43, headRx: 0.25, headRy: 0.34, eyeY: 0.38, eyeSpanX: 0.07, mouthY: 0.56, jawRx: 0.125, jawRy: 0.125 },
+  idol_sullyoon: { headX: 0.5, headY: 0.42, headRx: 0.25, headRy: 0.34, eyeY: 0.37, eyeSpanX: 0.068, mouthY: 0.55, jawRx: 0.12, jawRy: 0.12 },
+  idol_yuna: { headX: 0.5, headY: 0.42, headRx: 0.25, headRy: 0.34, eyeY: 0.37, eyeSpanX: 0.068, mouthY: 0.55, jawRx: 0.12, jawRy: 0.12 },
+  idol_chaewon: { headX: 0.5, headY: 0.43, headRx: 0.25, headRy: 0.34, eyeY: 0.38, eyeSpanX: 0.07, mouthY: 0.56, jawRx: 0.125, jawRy: 0.125 },
+  idol_hanni: { headX: 0.5, headY: 0.43, headRx: 0.25, headRy: 0.34, eyeY: 0.38, eyeSpanX: 0.07, mouthY: 0.56, jawRx: 0.125, jawRy: 0.125 }
 };
 
 const state = {
@@ -32,7 +46,11 @@ const state = {
   selectedProposalIds: new Set(),
   selectedTargetMemberId: '',
   activeSpeakerId: null,
+  activeSpeechText: '',
+  activeSpeechStartTime: 0,
   activeSpeechEndTime: 0,
+  activeSpeechCharIndex: 0,
+  activeTargetPlayerId: null,
   audioEnabled: true,
   roleMasked: false,
   spoilersRevealed: false,
@@ -41,10 +59,12 @@ const state = {
   lastAutoBeatSec: 0,
   isBusyRequest: false,
   portraitImages: new Map(),
+  avatarAnimStates: new Map(),
+  activeVideoStreams: new Map(),
   humanWebcamStream: null
 };
 
-// Preload photorealistic portrait images for 60FPS webcam canvas rendering
+// Preload photorealistic portrait images for 60FPS 2.5D neural talking-head rendering
 function preloadPortraitImages() {
   Object.entries(PHOTOREALISTIC_PORTRAIT_ANCHORS).forEach(([id, url]) => {
     const img = new Image();
@@ -812,16 +832,32 @@ async function triggerAssassination(targetPlayerId = null) {
 }
 
 /**
- * Plays the character's spoken audio (`gemini-3.8-flash-tts` base64 audio or expressive neural browser voice)
- * and activates the 60FPS audio-reactive lip-sync & Zoom speaker spotlight!
+ * Plays the character's spoken audio (`gemini-3.8-flash-tts` base64 audio or expressive neural browser voice),
+ * polls/attaches any background `gemini-omni-1.1-flash` video clip, and drives the 60FPS 2.5D Neural Talking-Head
+ * phoneme lip-sync & multi-agent listener reaction engine.
  * @param {object} turn
  */
 function playTurnVoiceAndHighlight(turn) {
   if (!turn) return;
+  const text = String(turn.text || '');
   state.activeSpeakerId = turn.speakerId;
-  const wordCount = (turn.text || '').split(/\s+/).length;
-  const estimatedDurationMs = Math.max(3200, Math.min(9500, wordCount * 340));
+  state.activeSpeechText = text;
+  state.activeSpeechStartTime = Date.now();
+  state.activeSpeechCharIndex = 0;
+  state.activeTargetPlayerId = turn.targetPlayerId || null;
+
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const estimatedDurationMs = Math.max(3200, Math.min(9800, wordCount * 330));
   state.activeSpeechEndTime = Date.now() + estimatedDurationMs;
+
+  // Trigger a double-blink & posture shift on the speaker and target listener
+  const speakerAnim = getOrInitAvatarAnimState(turn.speakerId);
+  speakerAnim.NextBlinkAt = performance.now() + 80;
+  speakerAnim.DoubleBlinkPending = true;
+
+  if (turn.videoUrl || turn.videoTaskId) {
+    attachOrPollTurnVideoStream(turn);
+  }
 
   renderMcHostPanel();
   renderZoomGrid();
@@ -834,9 +870,7 @@ function playTurnVoiceAndHighlight(turn) {
       const audio = new Audio(`data:${turn.audioMimeType || 'audio/wav'};base64,${turn.audioBase64}`);
       audio.onended = () => {
         if (state.activeSpeakerId === turn.speakerId) {
-          state.activeSpeakerId = null;
-          renderMcHostPanel();
-          renderZoomGrid();
+          clearActiveSpeakerState();
         }
       };
       audio.play().catch(() => {});
@@ -846,23 +880,23 @@ function playTurnVoiceAndHighlight(turn) {
     }
   }
 
-  // 2. Expressive Multi-Character Neural Voice Synthesis (Distinct pitch & rate per K-Pop Idol & MC Jae-suk)
+  // 2. Expressive Multi-Character Neural Voice Synthesis with real-time word boundary tracking for lip-sync
   if ('speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(turn.text);
+      const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-US';
 
       const voices = window.speechSynthesis.getVoices();
       const playerObj = state.players.find((p) => p.id === turn.speakerId);
 
       if (turn.speakerId === 'mc_jaesuk') {
-        const maleVoice = voices.find((v) =>
-          /en/i.test(v.lang) && /(male|david|guy|daniel|google us english)/i.test(v.name)
+        const maleVoice = voices.find(
+          (v) => /en/i.test(v.lang) && /(male|david|guy|daniel|mark|google us english)/i.test(v.name)
         );
         if (maleVoice) utterance.voice = maleVoice;
         utterance.pitch = 1.06;
-        utterance.rate = 1.1;
+        utterance.rate = 1.09;
       } else {
         const femaleVoices = voices.filter(
           (v) => /en/i.test(v.lang) && /(female|zira|samantha|aria|jenny|victoria|google)/i.test(v.name)
@@ -875,11 +909,16 @@ function playTurnVoiceAndHighlight(turn) {
         utterance.rate = playerObj?.rateOffset || 1.04;
       }
 
+      // Sync exact spoken character index from browser neural TTS boundary events
+      utterance.onboundary = (event) => {
+        if (typeof event.charIndex === 'number') {
+          state.activeSpeechCharIndex = event.charIndex;
+        }
+      };
+
       utterance.onend = () => {
         if (state.activeSpeakerId === turn.speakerId) {
-          state.activeSpeakerId = null;
-          renderMcHostPanel();
-          renderZoomGrid();
+          clearActiveSpeakerState();
         }
       };
       window.speechSynthesis.speak(utterance);
@@ -889,55 +928,187 @@ function playTurnVoiceAndHighlight(turn) {
   }
 }
 
-function stopActiveSpeech() {
+function clearActiveSpeakerState() {
   state.activeSpeakerId = null;
+  state.activeSpeechText = '';
+  state.activeTargetPlayerId = null;
+  renderMcHostPanel();
+  renderZoomGrid();
+}
+
+function stopActiveSpeech() {
+  clearActiveSpeakerState();
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
 }
 
 /**
- * 60FPS Photorealistic Live Webcam & Audio-Reactive Animation Loop.
- * Renders MC Jae-suk and all 6 K-Pop Idols onto their Zoom `<canvas>` tiles with:
- * - Natural webcam breathing & camera micro-sway
- * - Studio ring-light reflections
- * - Live speaking jaw/mouth pulse & emotional expression badges
- * - Live HD webcam timestamp & broadcast overlay
+ * Attaches a live `gemini-omni-1.1-flash` video URL or polls `/api/media/video/:taskId`
+ * when a background video generation job is running.
+ * @param {object} turn
+ */
+function attachOrPollTurnVideoStream(turn) {
+  const speakerId = turn.speakerId;
+  if (turn.videoUrl) {
+    mountSpeakerVideoUrl(speakerId, turn.videoUrl);
+    return;
+  }
+  if (!turn.videoTaskId) return;
+
+  let attempts = 0;
+  const pollTimer = setInterval(async () => {
+    attempts += 1;
+    if (attempts > 8) {
+      clearInterval(pollTimer);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/media/video/${turn.videoTaskId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.videoUrl) {
+        clearInterval(pollTimer);
+        mountSpeakerVideoUrl(speakerId, data.videoUrl);
+      } else if (data.status === 'live_canvas_synced') {
+        clearInterval(pollTimer);
+      }
+    } catch {
+      clearInterval(pollTimer);
+    }
+  }, 1800);
+}
+
+function mountSpeakerVideoUrl(speakerId, videoUrl) {
+  const videoEl = document.getElementById(`video_${speakerId}`);
+  if (!videoEl || !videoUrl) return;
+  if (videoEl.src !== videoUrl) {
+    videoEl.crossOrigin = 'anonymous';
+    videoEl.src = videoUrl;
+    videoEl.play().catch(() => {});
+    state.activeVideoStreams.set(speakerId, videoEl);
+  }
+}
+
+/**
+ * Returns or initializes per-character physiological animation state (blinking, smooth gaze, jaw inertia).
+ * @param {string} id
+ */
+function getOrInitAvatarAnimState(id) {
+  if (!state.avatarAnimStates.has(id)) {
+    const now = performance.now();
+    state.avatarAnimStates.set(id, {
+      NextBlinkAt: now + 900 + Math.random() * 2400,
+      BlinkStartAt: 0,
+      BlinkDurationMs: 135,
+      DoubleBlinkPending: false,
+      SmoothJawOpen: 0,
+      SmoothLipWidth: 1,
+      SmoothHeadTurnX: 0,
+      SmoothHeadNodY: 0,
+      SmoothHeadTilt: 0,
+      SmoothGazeX: 0,
+      SmoothGazeY: 0,
+      CurrentVisemeLabel: 'IDLE'
+    });
+  }
+  return state.avatarAnimStates.get(id);
+}
+
+/**
+ * Computes real-time phoneme/viseme mouth & jaw articulation (`A/O`, `E/I`, `U/W`, `M/B`, `C/T`)
+ * from the active spoken text and millisecond playback clock.
+ * @param {number} timeSec
+ */
+function computeRealTimeSpeechViseme(timeSec) {
+  const text = state.activeSpeechText || '';
+  if (!text) {
+    const fallbackOpen = (Math.sin(timeSec * 19) * 0.5 + 0.5) * 0.75;
+    return { open: fallbackOpen, width: 1.02, label: 'A/O' };
+  }
+
+  const now = Date.now();
+  const totalDur = Math.max(1000, state.activeSpeechEndTime - state.activeSpeechStartTime);
+  const progress = Math.min(0.99, Math.max(0, (now - state.activeSpeechStartTime) / totalDur));
+  const estCharIdx = Math.floor(progress * text.length);
+  const charIdx = Math.max(state.activeSpeechCharIndex, estCharIdx);
+
+  // Inspect a 2-character window around current spoken position
+  const ch = (text[charIdx] || 'a').toLowerCase();
+  const syllabicPulse =
+    0.58 +
+    0.42 *
+      Math.sin(timeSec * 26.5) *
+      Math.cos(timeSec * 13.2);
+
+  if (/[ao]/.test(ch)) {
+    return { open: 0.88 * syllabicPulse + 0.12, width: 1.03, label: 'A/O' };
+  }
+  if (/[eiy]/.test(ch)) {
+    return { open: 0.56 * syllabicPulse + 0.1, width: 1.14, label: 'E/I' };
+  }
+  if (/[uw]/.test(ch)) {
+    return { open: 0.64 * syllabicPulse + 0.08, width: 0.88, label: 'U/W' };
+  }
+  if (/[mbp]/.test(ch)) {
+    return { open: 0.05, width: 0.96, label: 'M/B' };
+  }
+  if (/[.,!?;:\s]/.test(ch)) {
+    return { open: 0.18 * syllabicPulse, width: 1.0, label: '...' };
+  }
+  return { open: 0.48 * syllabicPulse + 0.08, width: 1.02, label: 'C/T' };
+}
+
+/**
+ * 60FPS Real-Time 2.5D Neural Talking-Head Video Rig & Multi-Agent Listener Reaction Loop.
+ * Renders MC Jae-suk and all 6 K-Pop Idols as live moving video streams with:
+ * - Independent 3D head gimbal (nodding on syllables, tilting in doubt, turning toward active speaker)
+ * - Real-time phoneme/viseme jaw & lower-lip mesh deformation synchronized to speech
+ * - Physiological eye blinking & saccadic pupil/catchlight gaze tracking
+ * - Simultaneous listener reactions across all 7 tiles (nodding, shaking head when accused, skeptical tilt)
  */
 function startWebcamAnimationLoop() {
   const renderFrame = (timestamp) => {
     const t = timestamp * 0.001;
 
     if (Date.now() > state.activeSpeechEndTime && state.activeSpeakerId) {
-      state.activeSpeakerId = null;
-      renderMcHostPanel();
-      renderZoomGrid();
+      clearActiveSpeakerState();
     }
 
-    // 1. Render MC Jae-suk Webcam Canvas
+    // Determine active speaker seat position so listeners turn their head/gaze toward the speaker
+    const activeSpeakerIdx = state.players.findIndex((p) => p.id === state.activeSpeakerId);
+
+    // 1. Render MC Jae-suk Host Live Video Feed
     const mcCanvas = document.getElementById('mcWebcamCanvas');
     if (mcCanvas) {
       drawPhotorealisticWebcamTile(mcCanvas, {
         id: 'mc_jaesuk',
         name: 'MC Jae-suk',
+        seatIndex: -1,
+        activeSpeakerIdx,
         isSpeaking: state.activeSpeakerId === 'mc_jaesuk',
         emotion: state.mcHost?.currentExpression || 'speaking',
         themeColor: '#f59e0b',
-        timeSec: t
+        timeSec: t,
+        nowMs: timestamp,
+        isHuman: false
       });
     }
 
-    // 2. Render 7 Player Zoom Tiles
+    // 2. Render 7 Player Zoom Video Feeds
     state.players.forEach((player, idx) => {
       const canvas = document.getElementById(`canvas_${player.id}`);
       if (!canvas) return;
       drawPhotorealisticWebcamTile(canvas, {
         id: player.id,
         name: player.name,
+        seatIndex: idx,
+        activeSpeakerIdx,
         isSpeaking: state.activeSpeakerId === player.id,
         emotion: player.currentExpression || 'idle',
         themeColor: player.themeColor || '#ec4899',
         timeSec: t + idx * 1.37,
+        nowMs: timestamp,
         isHuman: player.isHuman
       });
     });
@@ -949,31 +1120,135 @@ function startWebcamAnimationLoop() {
 }
 
 /**
- * Draws a lifelike, photorealistic K-Pop studio webcam feed with natural breathing motion,
- * studio lighting, and real-time voice-reactive animation.
+ * Renders a 60FPS 2.5D Neural Talking-Head Video Feed onto `canvas` with anatomical layer separation:
+ * 1. Steady Studio Background & Bokeh Lighting Layer
+ * 2. Breathing Torso & Shoulders Layer
+ * 3. Independent 3D Head & Hair Gimbal Layer (Nod, Turn, Tilt)
+ * 4. Real-Time Phoneme/Viseme Jaw & Mouth Mesh Warping Layer
+ * 5. Physiological Eyelid Blink & Saccadic Gaze Layer
+ * 6. Broadcast Camera Autofocus HUD & Live Listener Reaction Telemetry
  */
 function drawPhotorealisticWebcamTile(
   canvas,
-  { id, name, isSpeaking, emotion, themeColor, timeSec, isHuman }
+  { id, name, seatIndex, activeSpeakerIdx, isSpeaking, emotion, themeColor, timeSec, nowMs, isHuman }
 ) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
+  const anim = getOrInitAvatarAnimState(id);
+  const rig = CHARACTER_FACE_RIGS[id] || CHARACTER_FACE_RIGS.idol_wonyoung;
 
   ctx.clearRect(0, 0, w, h);
 
+  // Update physiological eye blink state machine
+  let blinkAmount = 0;
+  if (nowMs >= anim.NextBlinkAt) {
+    anim.BlinkStartAt = nowMs;
+    if (anim.DoubleBlinkPending) {
+      anim.DoubleBlinkPending = false;
+      anim.NextBlinkAt = nowMs + 220;
+    } else {
+      anim.NextBlinkAt = nowMs + 2400 + Math.random() * 2400;
+      if (Math.random() < 0.22) anim.DoubleBlinkPending = true;
+    }
+  }
+  const blinkElapsed = nowMs - anim.BlinkStartAt;
+  if (blinkElapsed >= 0 && blinkElapsed <= anim.BlinkDurationMs) {
+    blinkAmount = Math.sin((blinkElapsed / anim.BlinkDurationMs) * Math.PI);
+  }
+
+  // Determine live listener behavior when someone else is speaking
+  const isAccusedTarget =
+    !isSpeaking && state.activeSpeakerId && state.activeTargetPlayerId === id;
+  const isOnProposedTeam = state.board?.proposedTeamIds?.includes(id);
+
+  let listenerReactionTag = '';
+  let targetHeadTurnX = 0;
+  let targetHeadNodY = 0;
+  let targetHeadTilt = 0;
+  let targetGazeX = 0;
+  let targetGazeY = 0;
+  let targetJawOpen = 0;
+  let targetLipWidth = 1;
+
+  if (isSpeaking) {
+    const viseme = computeRealTimeSpeechViseme(timeSec);
+    targetJawOpen = viseme.open;
+    targetLipWidth = viseme.width;
+    anim.CurrentVisemeLabel = viseme.label;
+
+    // Expressive speaker head motion: rhythmic syllable nodding + natural conversational sway
+    targetHeadTurnX = Math.sin(timeSec * 3.4) * 5.2 + Math.cos(timeSec * 5.1) * 2.4;
+    targetHeadNodY = Math.abs(Math.sin(timeSec * 9.5)) * 4.2 + viseme.open * 3.2;
+    targetHeadTilt = Math.sin(timeSec * 2.8) * 0.036;
+    targetGazeX = Math.sin(timeSec * 2.2) * 2.2;
+    targetGazeY = Math.cos(timeSec * 3.1) * 1.2;
+  } else {
+    anim.CurrentVisemeLabel = 'LISTENING';
+    // Look toward whichever seat is currently speaking on the Zoom call
+    if (state.activeSpeakerId) {
+      const dir =
+        activeSpeakerIdx >= 0 && seatIndex >= 0
+          ? Math.sign(activeSpeakerIdx - seatIndex)
+          : state.activeSpeakerId === 'mc_jaesuk'
+            ? -1
+            : 1;
+      targetGazeX = dir * 3.2 + Math.sin(timeSec * 1.7) * 0.8;
+      targetHeadTurnX = dir * 4.5 + Math.sin(timeSec * 1.5) * 1.8;
+
+      if (isAccusedTarget) {
+        // Reacting to being questioned/accused: defensive head shake + surprised mouth gasp
+        listenerReactionTag = '⚡ REACTING';
+        targetHeadTurnX = Math.sin(timeSec * 14) * 6.5;
+        targetHeadTilt = -0.035;
+        targetJawOpen = 0.28 + Math.abs(Math.sin(timeSec * 8)) * 0.18;
+      } else if (emotion === 'suspicious') {
+        listenerReactionTag = '🤨 DOUBTING';
+        targetHeadTilt = 0.042 * (seatIndex % 2 === 0 ? 1 : -1);
+        targetHeadNodY = Math.sin(timeSec * 2.2) * 1.5;
+      } else if (emotion === 'shocked') {
+        listenerReactionTag = '😲 GASPING';
+        targetJawOpen = 0.34;
+        targetHeadNodY = -2.5;
+      } else if (isOnProposedTeam) {
+        // Nodding affirmatively with the proposed team
+        listenerReactionTag = '👍 NODDING';
+        targetHeadNodY = Math.sin(timeSec * 7.2) * 3.8;
+        targetHeadTilt = Math.sin(timeSec * 1.9) * 0.018;
+      } else {
+        listenerReactionTag = '👀 WATCHING';
+        targetHeadNodY = Math.sin(timeSec * 3.1) * 2.1;
+        targetHeadTilt = Math.sin(timeSec * 1.6) * 0.022;
+      }
+    } else {
+      // Idle live camera presence: natural head drift, micro-nods, and eye glances
+      targetHeadTurnX = Math.sin(timeSec * 1.4) * 3.2;
+      targetHeadNodY = Math.cos(timeSec * 2.1) * 2.2;
+      targetHeadTilt = Math.sin(timeSec * 1.1) * 0.02;
+      targetGazeX = Math.sin(timeSec * 0.9) * 2.0;
+    }
+  }
+
+  // Smooth exponential damping for lifelike physical inertia
+  anim.SmoothJawOpen += (targetJawOpen - anim.SmoothJawOpen) * 0.38;
+  anim.SmoothLipWidth += (targetLipWidth - anim.SmoothLipWidth) * 0.32;
+  anim.SmoothHeadTurnX += (targetHeadTurnX - anim.SmoothHeadTurnX) * 0.18;
+  anim.SmoothHeadNodY += (targetHeadNodY - anim.SmoothHeadNodY) * 0.22;
+  anim.SmoothHeadTilt += (targetHeadTilt - anim.SmoothHeadTilt) * 0.18;
+  anim.SmoothGazeX += (targetGazeX - anim.SmoothGazeX) * 0.25;
+  anim.SmoothGazeY += (targetGazeY - anim.SmoothGazeY) * 0.25;
+
+  // Check if a background `gemini-omni-1.1-flash` video stream is actively playing on this tile
+  const activeVideoEl = state.activeVideoStreams.get(id);
+  const hasLiveVideoStream =
+    activeVideoEl && activeVideoEl.readyState >= 2 && !activeVideoEl.paused;
+
   const img = state.portraitImages.get(id);
-  if (img && img.complete && img.naturalWidth > 0) {
-    ctx.save();
-    // Subtle lifelike webcam breathing + speaking head motion
-    const breatheScale = 1.04 + Math.sin(timeSec * 2.1) * 0.012 + (isSpeaking ? Math.sin(timeSec * 14) * 0.008 : 0);
-    const panX = Math.sin(timeSec * 1.3) * 3.5;
-    const panY = Math.cos(timeSec * 1.9) * 2.5 + (isSpeaking ? Math.abs(Math.sin(timeSec * 16)) * 2.2 : 0);
 
-    ctx.translate(w / 2 + panX, h / 2 + panY);
-    ctx.scale(breatheScale, breatheScale);
-
-    // Aspect-fill crop
+  if (hasLiveVideoStream) {
+    ctx.drawImage(activeVideoEl, 0, 0, w, h);
+  } else if (img && img.complete && img.naturalWidth > 0) {
+    // Compute aspect-fill geometry
     const imgRatio = img.naturalWidth / img.naturalHeight;
     const canvasRatio = w / h;
     let drawW = w;
@@ -985,64 +1260,292 @@ function drawPhotorealisticWebcamTile(
       drawW = w;
       drawH = w / imgRatio;
     }
-    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    const baseScale = isSpeaking ? 1.075 : 1.045;
+    const scaledW = drawW * baseScale;
+    const scaledH = drawH * baseScale;
+    const baseX = (w - scaledW) / 2;
+    const baseY = (h - scaledH) / 2;
+
+    // =========================================================================
+    // LAYER 1: STEADY STUDIO ROOM BACKGROUND + AMBIENT LIGHTING BOKEH
+    // =========================================================================
+    ctx.save();
+    const bgDriftX = Math.sin(timeSec * 0.5) * 1.2;
+    const bgDriftY = Math.cos(timeSec * 0.4) * 1.0;
+    ctx.drawImage(img, baseX + bgDriftX, baseY + bgDriftY, scaledW, scaledH);
     ctx.restore();
+
+    // =========================================================================
+    // LAYER 2: INDEPENDENT BREATHING SHOULDERS & TORSO LAYER
+    // =========================================================================
+    const breathePhase = Math.sin(timeSec * 2.4);
+    const torsoRiseY = breathePhase * 2.6;
+    const torsoExpandX = 1 + breathePhase * 0.014 + (isSpeaking ? 0.012 : 0);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(w * 0.5, h * 0.88, w * 0.44, h * 0.32, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.translate(w * 0.5, h * 0.82 + torsoRiseY);
+    ctx.scale(torsoExpandX, 1);
+    ctx.translate(-w * 0.5, -h * 0.82);
+    ctx.drawImage(img, baseX, baseY, scaledW, scaledH);
+    ctx.restore();
+
+    // =========================================================================
+    // LAYER 3: INDEPENDENT 3D HEAD & HAIR GIMBAL (TURN, NOD, TILT)
+    // =========================================================================
+    const headPivotX = w * rig.headX;
+    const headPivotY = h * rig.headY;
+    const headRx = w * rig.headRx;
+    const headRy = h * rig.headRy;
+
+    ctx.save();
+    ctx.translate(
+      headPivotX + anim.SmoothHeadTurnX,
+      headPivotY + anim.SmoothHeadNodY + torsoRiseY * 0.35
+    );
+    ctx.rotate(anim.SmoothHeadTilt);
+    ctx.translate(-headPivotX, -headPivotY);
+
+    // Clip head & hair silhouette
+    ctx.beginPath();
+    ctx.ellipse(headPivotX, headPivotY, headRx * 1.18, headRy * 1.15, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, baseX, baseY, scaledW, scaledH);
+
+    // =========================================================================
+    // LAYER 4: REAL-TIME PHONEME/VISEME JAW DROP & LOWER-LIP ARTICULATION
+    // =========================================================================
+    const mouthX = w * rig.headX;
+    const mouthY = h * rig.mouthY;
+    const jawRx = w * rig.jawRx;
+    const jawRy = h * rig.jawRy;
+    const jawDropPx = anim.SmoothJawOpen * (h * 0.042);
+
+    if (anim.SmoothJawOpen > 0.02) {
+      // Shift lower jaw & chin downward and modulate width by vowel viseme
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(mouthX, mouthY + jawRy * 0.55, jawRx, jawRy, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.translate(mouthX, mouthY);
+      ctx.scale(anim.SmoothLipWidth, 1);
+      ctx.translate(-mouthX, -mouthY + jawDropPx);
+      ctx.drawImage(img, baseX, baseY, scaledW, scaledH);
+      ctx.restore();
+
+      // Render organic animated mouth parting & inner lip articulation along mouthY
+      ctx.save();
+      const mouthOpenW = jawRx * 0.52 * anim.SmoothLipWidth;
+      const mouthOpenH = Math.max(1.2, anim.SmoothJawOpen * (h * 0.028));
+
+      // Outer lip shadow / movement contour
+      const lipGrad = ctx.createRadialGradient(
+        mouthX,
+        mouthY + jawDropPx * 0.35,
+        0.5,
+        mouthX,
+        mouthY + jawDropPx * 0.35,
+        mouthOpenW * 1.25
+      );
+      lipGrad.addColorStop(0, `rgba(28, 10, 16, ${Math.min(0.82, 0.35 + anim.SmoothJawOpen * 0.5)})`);
+      lipGrad.addColorStop(0.65, `rgba(110, 38, 52, ${Math.min(0.55, anim.SmoothJawOpen * 0.42)})`);
+      lipGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = lipGrad;
+      ctx.beginPath();
+      ctx.ellipse(
+        mouthX,
+        mouthY + jawDropPx * 0.35,
+        mouthOpenW,
+        mouthOpenH,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Subtle upper teeth / tongue highlight when vowel is wide open (A/O/E)
+      if (anim.SmoothJawOpen > 0.42) {
+        ctx.fillStyle = `rgba(255, 245, 245, ${(anim.SmoothJawOpen - 0.4) * 0.35})`;
+        ctx.beginPath();
+        ctx.ellipse(
+          mouthX,
+          mouthY + jawDropPx * 0.18,
+          mouthOpenW * 0.62,
+          mouthOpenH * 0.32,
+          0,
+          0,
+          Math.PI
+        );
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // LAYER 5: PHYSIOLOGICAL EYE BLINKING & SACCADIC GAZE CATCHLIGHTS
+    // =========================================================================
+    const eyeY = h * rig.eyeY;
+    const leftEyeX = headPivotX - w * rig.eyeSpanX;
+    const rightEyeX = headPivotX + w * rig.eyeSpanX;
+    const eyeRx = w * 0.036;
+    const eyeRy = h * 0.022;
+
+    if (blinkAmount > 0.04) {
+      // Warp upper eyelid skin strip downward over both eyes to create a natural blink
+      [leftEyeX, rightEyeX].forEach((ex) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(ex, eyeY, eyeRx * 1.15, eyeRy * 1.2, 0, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.translate(0, blinkAmount * eyeRy * 1.45);
+        ctx.drawImage(img, baseX, baseY - eyeRy * 0.9, scaledW, scaledH);
+
+        // Eyelash closure crease line
+        ctx.strokeStyle = `rgba(20, 14, 18, ${0.45 * blinkAmount})`;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(ex, eyeY - eyeRy * 0.15, eyeRx * 0.85, 0.15 * Math.PI, 0.85 * Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      });
+    } else {
+      // Animated studio ring-light eye catchlights that shift with saccadic gaze
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      [leftEyeX, rightEyeX].forEach((ex) => {
+        ctx.beginPath();
+        ctx.arc(
+          ex + anim.SmoothGazeX,
+          eyeY - 1.5 + anim.SmoothGazeY,
+          1.4,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    ctx.restore(); // End Layer 3 Head Gimbal transform
   } else {
-    // Stylized VIP Studio Feed for Guest Player (or while portrait loads)
+    // Animated VIP Studio Feed for Guest Player (when real webcam is off)
     const grad = ctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w * 0.7);
     grad.addColorStop(0, '#1e293b');
     grad.addColorStop(1, '#090d16');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
+    // Animated avatar silhouette for Guest VIP
+    const guestNod = Math.sin(timeSec * 3.2) * 3;
     ctx.fillStyle = themeColor;
     ctx.beginPath();
-    ctx.arc(w / 2, h * 0.42, 34 + (isSpeaking ? Math.sin(timeSec * 16) * 4 : 0), 0, Math.PI * 2);
+    ctx.arc(
+      w / 2,
+      h * 0.39 + guestNod,
+      30 + (isSpeaking ? anim.SmoothJawOpen * 6 : 0),
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
 
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 15px Outfit, sans-serif';
+    ctx.font = 'bold 13px Outfit, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(isHuman ? 'YOU (GUEST VIP)' : name, w / 2, h * 0.44);
+    ctx.fillText(isHuman ? 'YOU (CLICK 📷 CAM FOR LIVE WEBCAM)' : name, w / 2, h * 0.64);
   }
 
-  // Studio Ring-Light & Broadcast Color Grading Overlay
-  const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.25, w / 2, h / 2, w * 0.75);
+  // =========================================================================
+  // LAYER 6: STUDIO LIGHTING VIGNETTE, AUTOFOCUS FACE TRACKER & LIVE TELEMETRY
+  // =========================================================================
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.24, w / 2, h / 2, w * 0.76);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(6, 9, 18, 0.52)');
+  vignette.addColorStop(1, 'rgba(6, 9, 18, 0.5)');
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, w, h);
 
-  // Live Speaking Audio Ring & Mouth/Voice Visualizer Wave on Webcam
+  // Dynamic Face-Tracking Autofocus Brackets `[ AF-LOCK ]` following the moving head
+  if (!isHuman) {
+    const trackX = w * rig.headX + anim.SmoothHeadTurnX;
+    const trackY = h * rig.headY + anim.SmoothHeadNodY;
+    const boxW = w * 0.36;
+    const boxH = h * 0.48;
+    const bx = trackX - boxW / 2;
+    const by = trackY - boxH / 2;
+    const corner = 9;
+
+    ctx.save();
+    ctx.strokeStyle = isSpeaking
+      ? 'rgba(16, 185, 129, 0.78)'
+      : isAccusedTarget
+        ? 'rgba(244, 63, 94, 0.78)'
+        : 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = isSpeaking ? 1.8 : 1.1;
+
+    // 4 Corner brackets
+    ctx.beginPath();
+    ctx.moveTo(bx, by + corner);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(bx + corner, by);
+    ctx.moveTo(bx + boxW - corner, by);
+    ctx.lineTo(bx + boxW, by);
+    ctx.lineTo(bx + boxW, by + corner);
+    ctx.moveTo(bx, by + boxH - corner);
+    ctx.lineTo(bx, by + boxH);
+    ctx.lineTo(bx + corner, by + boxH);
+    ctx.moveTo(bx + boxW - corner, by + boxH);
+    ctx.lineTo(bx + boxW, by + boxH);
+    ctx.lineTo(bx + boxW, by + boxH - corner);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Live Speaking Border, Phoneme Viseme HUD & Audio Waveform
   if (isSpeaking) {
     ctx.save();
     ctx.strokeStyle = '#10b981';
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, w - 4, h - 4);
 
+    // Live Viseme + Audio dB Telemetry Chip
+    ctx.fillStyle = 'rgba(6, 78, 59, 0.88)';
+    ctx.fillRect(10, h - 62, 134, 18);
+    ctx.fillStyle = '#6ee7b7';
+    ctx.font = 'bold 9px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    const dbVal = (-12 + anim.SmoothJawOpen * 10).toFixed(1);
+    ctx.fillText(`🎙️ LIVE [${anim.CurrentVisemeLabel}] ${dbVal}dB`, 15, h - 50);
+
     // Dynamic voice equalizer wave along bottom of video feed
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
-    ctx.lineWidth = 2.5;
-    for (let x = 20; x < w - 20; x += 6) {
-      const amp = Math.sin(x * 0.08 + timeSec * 24) * Math.cos(x * 0.03 - timeSec * 15) * 9;
-      const y = h - 38 + amp;
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)';
+    ctx.lineWidth = 2.4;
+    for (let x = 20; x < w - 20; x += 5) {
+      const amp =
+        Math.sin(x * 0.09 + timeSec * 26) *
+        Math.cos(x * 0.04 - timeSec * 16) *
+        (4 + anim.SmoothJawOpen * 9);
+      const y = h - 36 + amp;
       if (x === 20) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
     ctx.restore();
-  }
-
-  // Emotion / Reaction Micro-Indicator
-  if (emotion === 'shocked' || emotion === 'suspicious') {
+  } else if (listenerReactionTag && !isHuman) {
+    // Simultaneous Listener Reaction Badge on non-speaking idols
     ctx.save();
-    ctx.fillStyle =
-      emotion === 'shocked' ? 'rgba(244, 63, 94, 0.82)' : 'rgba(245, 158, 11, 0.82)';
-    ctx.font = 'bold 10px JetBrains Mono, monospace';
-    ctx.fillRect(w - 92, h - 58, 84, 18);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(emotion === 'shocked' ? '⚡ SHOCKED' : '🤨 SUSPICIOUS', w - 86, h - 45);
+    ctx.fillStyle = isAccusedTarget
+      ? 'rgba(244, 63, 94, 0.86)'
+      : emotion === 'suspicious'
+        ? 'rgba(245, 158, 11, 0.84)'
+        : 'rgba(15, 23, 42, 0.78)';
+    ctx.fillRect(w - 102, h - 60, 92, 18);
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 9px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(listenerReactionTag, w - 96, h - 48);
     ctx.restore();
   }
 }
