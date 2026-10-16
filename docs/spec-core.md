@@ -154,19 +154,25 @@ Every AI Idol turn passes through a **2-Stage Verification Loop** before reachin
 ---
 
 ## 6. UI/UX Layout & Hackathon Judging Features
-1. **Discord Voice & Video Stage UI (`#avalon-stage-7p`)**:
-   - **Left Server Rail & Channel Sidebar (`64px + 244px` Fixed Width)**: Discord server icon rail, active `#avalon-stage-7p` voice channel with live connected members list, Quest Track (`1–5`), Reject Count (`1/5` to `5/5`), Secret Role Card, and bottom Discord User Control Bar (Mic/Deafen/Settings). Fixed width and protected from chat drawer resizing.
+1. **3-Zone Consolidated Button Architecture (`#avalon-stage-7p`)**:
+   - **Zone 1 — Left Sidebar (`NEW GAME & ROLE SETUP` inside `#secretRoleCard`)**:
+     - Single home for starting or resetting matches: Role Selector dropdown (`#preferredRoleSelect`), full-width primary **`🔄 Start New Game (Quest 1)`** button (`#startNewGamePrimaryBtn`), and 2 compact Judge Demo Jump buttons (`⚡ Demo: Quest 4` and `🗡️ Demo: Assassin`).
+   - **Zone 2 — Top Context Action Bar (`#phaseActionBanner`)**:
+     - Single home for all in-game phase progression controls (`Propose Team`, `⏭️ Next Idol Turn`, `🗳️ Start Vote`, `✅ Approve / ❌ Reject`, `✅ Success / 🗡️ Fail`, `🗡️ Resolve Assassin Shot`, and `🔄 Play Again`).
+   - **Zone 3 — Bottom Call Controls Dock (`.call-controls-dock`)**:
+     - Single home for media and view toggles, using 5 explicitly labeled pill buttons (`Voice Mic`, `My Cam`, `Audio ON/OFF`, `X-Ray`, and `Side Panel`).
+2. **Discord Voice & Video Stage UI**:
+   - **Left Server Rail & Channel Sidebar (`64px + 244px` Fixed Width)**: Discord server icon rail (`ARCH` diagram link + Settings gear `#apiKeyModalBtn`), active `#avalon-stage-7p` voice channel with live connected members list, Quest Track (`1–5`), Reject Count (`1/5` to `5/5`), Secret Role & New Game Setup Card, and bottom Discord User Status Bar. Fixed width and protected from chat drawer resizing.
    - **Center Discord Video Stage Grid (`.video-call-stage`)**:
-     - **MC Jae-suk Moderator Tile** + **6 Photorealistic Idol Video Tiles** + **Human Player Tile** + **Bottom Voice Stage Action Bar**.
+     - **MC Jae-suk Moderator Tile** + **6 Photorealistic Idol Video Tiles** + **Human Player Tile**.
      - Each tile shows: Member Name, Leader Crown (`👑`), Proposed Team Shield (`🛡️`), Discord Green Speaking Ring, Last Vote Badge (`⭕ APPROVE` / `❌ REJECT`), and Private Night Knowledge indicator (only visible for roles the Human is allowed to see!).
      - Automatically scales and reflows from a `4×2` grid to a compact `2×4` grid (`.compact-stage`) when the user drags the right chat drawer wider.
    - **Resizable Right Party Chat & Judge X-Ray Panel (`#rightChatDrawer` + `#chatResizeHandle`)**:
      - Features a draggable left-edge splitter (`#chatResizeHandle`) allowing the player to smoothly drag and expand the chat window while shrinking the center video stage (never encroaching on the left settings/channel sidebar).
      - Enforces Avalon's **100% Open Public Table Talk Rule**: all chat messages are broadcast publicly to the entire room (`#avalon-stage-7p`) with no targeted `@Idol` calling chips.
-     - Supports **Fast Text-Only Mode (`skipTts`)**: toggling off the Speaker button (`#audioToggleBtn`) bypasses server-side TTS/video synthesis so players can test and play at high speed via text chat alone.
-2. **Judge / Director X-Ray Tab (Toggleable for Hackathon Demo)**:
+     - Supports **Fast Text-Only Mode (`skipTts`)**: toggling `Audio OFF` (`#audioToggleBtn`) bypasses server-side TTS/video synthesis so players can test and play at high speed via text chat alone.
+3. **Judge / Director X-Ray Tab (Toggleable via `X-Ray` Pill Button)**:
    - Displays live **`gemini-4-argon` (`thinking_level`)** reasoning traces, the hidden **Bayesian Suspicion Matrix**, each AI idol's **Private Inner Monologue** vs **Public Speech**, and **Verification Loop Pass/Self-Heal Logs** so judges can verify in < 3 minutes that all 6 AI idols are running genuine, deep multi-agent social deduction.
-   - Includes a **"Next Beat"** control for live judging so a full multi-quest demonstration fits smoothly inside the 3-minute judging window.
 
 ---
 

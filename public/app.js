@@ -321,16 +321,9 @@ function renderSecretRoleCard() {
 
   const activePref = state.board?.preferredRole || state.preferredRole || 'RANDOM';
   const sidebarSelect = document.getElementById('preferredRoleSelect');
-  const stageSelect = document.getElementById('stageRoleSelect');
   if (sidebarSelect && sidebarSelect.value !== activePref) {
     sidebarSelect.value = activePref;
   }
-  if (stageSelect && stageSelect.value !== activePref) {
-    stageSelect.value = activePref;
-  }
-  document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.role === activePref);
-  });
 
   const roleTitle = document.getElementById('humanRoleTitle');
   const alignBadge = document.getElementById('humanAlignmentBadge');
@@ -358,6 +351,7 @@ function renderSecretRoleCard() {
 
 /**
  * Renders the context-sensitive Phase Action Bar in the top header of the video stage.
+ * All in-game phase progression buttons live inside `#bannerActionControls`.
  */
 function renderPhaseActionBanner() {
   const board = state.board;
@@ -388,29 +382,43 @@ function renderPhaseActionBanner() {
       instruction.textContent = `Leader ${board.leaderName} is selecting ${board.requiredTeamSize} players for Quest ${board.currentQuestNumber}...`;
       const btn = document.createElement('button');
       btn.className = 'action-cta-btn blurple';
-      btn.textContent = `Lock Proposal`;
+      btn.textContent = `✨ Let Leader Propose`;
       btn.onclick = () => triggerTeamProposal([]);
       controls.appendChild(btn);
     }
   } else if (board.phase === 'DISCUSSION') {
     const teamStr = board.proposedTeamNames.join(', ');
-    instruction.textContent = `Proposed Team: ${teamStr} — Discuss or call vote`;
+    instruction.textContent = `Proposed Team: ${teamStr}`;
+
+    const nextBeatBtn = document.createElement('button');
+    nextBeatBtn.className = 'action-cta-btn secondary';
+    nextBeatBtn.textContent = '⏭️ Next Idol Turn';
+    nextBeatBtn.title = 'Stay silent or advance to the next AI Idol reaction immediately';
+    nextBeatBtn.onclick = () => {
+      state.discussionElapsedSec = Math.max(state.discussionElapsedSec, 25);
+      state.lastAutoBeatSec = state.discussionElapsedSec;
+      triggerDiscussionStep(null);
+    };
+
     const voteNowBtn = document.createElement('button');
     voteNowBtn.className = 'action-cta-btn blurple';
-    voteNowBtn.textContent = 'Start Vote';
+    voteNowBtn.textContent = '🗳️ Start Vote';
+    voteNowBtn.title = 'End discussion and proceed to the 7-player Team Vote';
     voteNowBtn.onclick = () => triggerCallVotePhase();
+
+    controls.appendChild(nextBeatBtn);
     controls.appendChild(voteNowBtn);
   } else if (board.phase === 'TEAM_VOTE') {
     const teamStr = board.proposedTeamNames.join(', ');
     instruction.textContent = `Vote on ${board.leaderName}'s Team [${teamStr}]:`;
     const approveBtn = document.createElement('button');
     approveBtn.className = 'action-cta-btn approve';
-    approveBtn.textContent = 'Approve';
+    approveBtn.textContent = '✅ Approve';
     approveBtn.onclick = () => triggerSubmitVote('APPROVE');
 
     const rejectBtn = document.createElement('button');
     rejectBtn.className = 'action-cta-btn reject';
-    rejectBtn.textContent = 'Reject';
+    rejectBtn.textContent = '❌ Reject';
     rejectBtn.onclick = () => triggerSubmitVote('REJECT');
 
     controls.appendChild(approveBtn);
@@ -423,14 +431,14 @@ function renderPhaseActionBanner() {
       instruction.textContent = `You are on Quest ${board.currentQuestNumber} — Submit your Quest card:`;
       const successBtn = document.createElement('button');
       successBtn.className = 'action-cta-btn approve';
-      successBtn.textContent = 'Success';
+      successBtn.textContent = '✅ Success';
       successBtn.onclick = () => triggerSubmitQuestCard('SUCCESS');
       controls.appendChild(successBtn);
 
       if (humanAlignment === 'EVIL') {
         const failBtn = document.createElement('button');
         failBtn.className = 'action-cta-btn reject';
-        failBtn.textContent = 'Fail (Sabotage)';
+        failBtn.textContent = '🗡️ Fail (Sabotage)';
         failBtn.onclick = () => triggerSubmitQuestCard('FAIL');
         controls.appendChild(failBtn);
       }
@@ -438,7 +446,7 @@ function renderPhaseActionBanner() {
       instruction.textContent = `Team [${board.proposedTeamNames.join(', ')}] is executing Quest ${board.currentQuestNumber}...`;
       const revealBtn = document.createElement('button');
       revealBtn.className = 'action-cta-btn blurple';
-      revealBtn.textContent = 'Reveal Outcome';
+      revealBtn.textContent = '⚡ Reveal Outcome';
       revealBtn.onclick = () => triggerSubmitQuestCard('SUCCESS');
       controls.appendChild(revealBtn);
     }
@@ -450,7 +458,7 @@ function renderPhaseActionBanner() {
       instruction.textContent = `Good passed 3 Quests — Assassin is choosing a target for Merlin...`;
       const fireBtn = document.createElement('button');
       fireBtn.className = 'action-cta-btn reject';
-      fireBtn.textContent = 'Resolve Assassin Shot';
+      fireBtn.textContent = '🗡️ Resolve Assassin Shot';
       fireBtn.onclick = () => triggerAssassination(null);
       controls.appendChild(fireBtn);
     }
@@ -459,7 +467,7 @@ function renderPhaseActionBanner() {
     instruction.textContent = board.winReason;
     const playAgainBtn = document.createElement('button');
     playAgainBtn.className = 'action-cta-btn blurple';
-    playAgainBtn.textContent = 'New Game';
+    playAgainBtn.textContent = '🔄 Play Again';
     playAgainBtn.onclick = () => startNewGame('STANDARD');
     controls.appendChild(playAgainBtn);
   }
@@ -1419,6 +1427,7 @@ async function toggleHumanWebcam() {
  */
 function setupMicrophoneInput() {
   const micBtn = document.getElementById('micPushToTalkBtn');
+  const micLabel = document.getElementById('micBtnLabel');
   const chatInput = document.getElementById('humanChatInput');
   if (!micBtn) return;
 
@@ -1428,6 +1437,14 @@ function setupMicrophoneInput() {
   let mediaRecorder = null;
   let recordedChunks = [];
   let webSpeechTranscribed = false;
+
+  const setRecordingState = (recording) => {
+    isListening = recording;
+    micBtn.classList.toggle('recording', recording);
+    if (micLabel) {
+      micLabel.textContent = recording ? 'Listening...' : 'Voice Mic';
+    }
+  };
 
   if (SpeechRecognition) {
     recognition = new SpeechRecognition();
@@ -1447,8 +1464,7 @@ function setupMicrophoneInput() {
     };
 
     recognition.onend = () => {
-      isListening = false;
-      micBtn.classList.remove('recording');
+      setRecordingState(false);
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
       }
@@ -1457,8 +1473,7 @@ function setupMicrophoneInput() {
 
   micBtn.addEventListener('click', async () => {
     if (isListening) {
-      isListening = false;
-      micBtn.classList.remove('recording');
+      setRecordingState(false);
       if (recognition) recognition.stop();
       if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
@@ -1467,8 +1482,7 @@ function setupMicrophoneInput() {
     }
 
     webSpeechTranscribed = false;
-    isListening = true;
-    micBtn.classList.add('recording');
+    setRecordingState(true);
 
     if (recognition) {
       try {
@@ -1527,7 +1541,10 @@ function setupMicrophoneInput() {
 }
 
 /**
- * Initializes all UI event listeners and starts the initial game session.
+ * Initializes all UI event listeners across the 3 consolidated button zones:
+ * 1. Left Sidebar (`#secretRoleCard`): Role Setup, Start New Game, Demo Jumps
+ * 2. Top Context Bar (`#phaseActionBanner`): Phase-specific game progression buttons
+ * 3. Bottom Call Controls Dock (`.call-controls-dock`): Media & Panel toggles
  */
 function initApp() {
   preloadPortraitImages();
@@ -1548,73 +1565,29 @@ function initApp() {
     await triggerDiscussionStep(text);
   });
 
-  // Stay Silent / Next Idol Turn Button
-  document.getElementById('nextAiBeatBtn')?.addEventListener('click', () => {
-    if (state.board?.phase === 'DISCUSSION') {
-      state.discussionElapsedSec = Math.max(state.discussionElapsedSec, 25);
-      state.lastAutoBeatSec = state.discussionElapsedSec;
-      triggerDiscussionStep(null);
-    }
+  // Zone 1: Left Sidebar — Primary "Start New Game (Quest 1)" Button
+  document.getElementById('startNewGamePrimaryBtn')?.addEventListener('click', () => {
+    const selectedRole =
+      document.getElementById('preferredRoleSelect')?.value || state.preferredRole || 'RANDOM';
+    state.preferredRole = selectedRole;
+    startNewGame('STANDARD', selectedRole);
   });
 
-  // Call Vote Now Button
-  document.getElementById('callVoteEarlyBtn')?.addEventListener('click', () => {
-    if (state.board?.phase === 'DISCUSSION') {
-      triggerCallVotePhase();
-    }
+  // Zone 1: Left Sidebar — Role Selector Dropdown
+  document.getElementById('preferredRoleSelect')?.addEventListener('change', (e) => {
+    const selectedRole = e.target.value || 'RANDOM';
+    state.preferredRole = selectedRole;
+    startNewGame('STANDARD', selectedRole);
   });
 
-  // Dock Camera Toggle Button
-  document.getElementById('dockCamBtn')?.addEventListener('click', () => {
-    toggleHumanWebcam();
-  });
-
-  // New Game / Hangup Call Button
-  document.getElementById('newGameHangupBtn')?.addEventListener('click', () => {
-    startNewGame('STANDARD');
-  });
-
-  // Toggle Right Chat Drawer
-  document.getElementById('toggleChatDrawerBtn')?.addEventListener('click', (e) => {
-    const appEl = document.getElementById('discordApp');
-    if (!appEl) return;
-    const isCollapsed = appEl.classList.toggle('chat-collapsed');
-    e.currentTarget.classList.toggle('active', !isCollapsed);
-  });
-
-  // Scenario Preset Buttons (both in left rail and sidebar)
+  // Zone 1: Left Sidebar — Demo Scenario Jump Buttons (Quest 4 Crisis / Final Assassin)
   document.querySelectorAll('[data-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      startNewGame(btn.dataset.preset);
+      startNewGame(btn.dataset.preset, state.preferredRole);
     });
   });
 
-  // Role Selector Dropdowns & Quick Chips
-  const syncRoleChoiceAndRestart = (selectedRole) => {
-    state.preferredRole = selectedRole;
-    const sidebarSelect = document.getElementById('preferredRoleSelect');
-    const stageSelect = document.getElementById('stageRoleSelect');
-    if (sidebarSelect) sidebarSelect.value = selectedRole;
-    if (stageSelect) stageSelect.value = selectedRole;
-    document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.role === selectedRole);
-    });
-    startNewGame('STANDARD', selectedRole);
-  };
-
-  document.getElementById('preferredRoleSelect')?.addEventListener('change', (e) => {
-    syncRoleChoiceAndRestart(e.target.value);
-  });
-  document.getElementById('stageRoleSelect')?.addEventListener('change', (e) => {
-    syncRoleChoiceAndRestart(e.target.value);
-  });
-  document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      syncRoleChoiceAndRestart(chip.dataset.role || 'RANDOM');
-    });
-  });
-
-  // Hide/Show Human Secret Role
+  // Zone 1: Left Sidebar — Hide/Show Human Secret Role
   document.getElementById('toggleRoleMaskBtn')?.addEventListener('click', (e) => {
     state.roleMasked = !state.roleMasked;
     e.currentTarget.textContent = state.roleMasked ? 'Show' : 'Hide';
@@ -1622,16 +1595,41 @@ function initApp() {
     renderZoomGrid();
   });
 
-  // Voice & TTS Audio Toggle
+  // Zone 3: Bottom Dock — My Cam Toggle
+  document.getElementById('dockCamBtn')?.addEventListener('click', () => {
+    toggleHumanWebcam();
+  });
+
+  // Zone 3: Bottom Dock — Voice & TTS Audio Toggle
   document.getElementById('audioToggleBtn')?.addEventListener('click', (e) => {
     state.audioEnabled = !state.audioEnabled;
     e.currentTarget.classList.toggle('active', state.audioEnabled);
+    const labelEl = document.getElementById('audioToggleLabel');
+    if (labelEl) {
+      labelEl.textContent = state.audioEnabled ? 'Audio ON' : 'Audio OFF';
+    }
     if (!state.audioEnabled) {
       stopActiveSpeech();
       if (state.bgmAudio) state.bgmAudio.pause();
     } else {
       syncPhaseAdaptiveBgm();
     }
+  });
+
+  // Zone 3: Bottom Dock — Open Judge X-Ray Inspector
+  document.getElementById('judgeXrayToggleBtn')?.addEventListener('click', () => {
+    const appEl = document.getElementById('discordApp');
+    appEl?.classList.remove('chat-collapsed');
+    document.getElementById('toggleChatDrawerBtn')?.classList.add('active');
+    document.getElementById('xrayTabButton')?.click();
+  });
+
+  // Zone 3: Bottom Dock — Toggle Right Side Panel (Voice Chat / Inspector)
+  document.getElementById('toggleChatDrawerBtn')?.addEventListener('click', (e) => {
+    const appEl = document.getElementById('discordApp');
+    if (!appEl) return;
+    const isCollapsed = appEl.classList.toggle('chat-collapsed');
+    e.currentTarget.classList.toggle('active', !isCollapsed);
   });
 
   // Right Rail Tabs (Voice Chat vs Inspector X-Ray)
@@ -1642,13 +1640,6 @@ function initApp() {
       tabBtn.classList.add('active');
       document.getElementById(tabBtn.dataset.tab)?.classList.add('active');
     });
-  });
-
-  document.getElementById('judgeXrayToggleBtn')?.addEventListener('click', () => {
-    const appEl = document.getElementById('discordApp');
-    appEl?.classList.remove('chat-collapsed');
-    document.getElementById('toggleChatDrawerBtn')?.classList.add('active');
-    document.getElementById('xrayTabButton')?.click();
   });
 
   // Spoiler Toggle in Judge X-Ray
