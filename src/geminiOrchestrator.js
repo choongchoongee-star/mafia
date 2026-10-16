@@ -1548,14 +1548,9 @@ export async function generateParallelTeamVotes(game, humanVote = null) {
   const proposedIds = game.proposedTeamIds;
   const allVotes = {};
 
-  // 1. Record Human Player vote (or auto-fallback if 30s timer expired)
+  // 1. Record Human Player vote (or auto-APPROVE if 30s timer expired so passive play never deadlocks the phase)
   const humanRole = game.roleAssignments.player_human;
-  const finalHumanVote =
-    humanVote === 'APPROVE' || humanVote === 'REJECT'
-      ? humanVote
-      : isHammer || proposedIds.includes('player_human')
-        ? 'APPROVE'
-        : 'REJECT';
+  const finalHumanVote = humanVote === 'REJECT' ? 'REJECT' : 'APPROVE';
 
   allVotes.player_human = {
     vote: finalHumanVote,
@@ -1652,6 +1647,52 @@ export async function generateParallelTeamVotes(game, humanVote = null) {
       allVotes[idol.id] = { vote, reason, innerThought };
     })
   );
+
+  // 3. Prevent vote-rejection deadlocks:
+  // - When the Human player approves (or auto-advances), ensure at least 4 of 7 votes are APPROVE so the game advances to QUEST_EXECUTION.
+  // - When the Human player explicitly clicks REJECT (and it's not Hammer 5/5), ensure at least 4 of 7 votes are REJECT so the Leader crown rotates.
+  const countApproves = () =>
+    Object.values(allVotes).filter((entry) => entry && entry.vote === 'APPROVE').length;
+
+  if (finalHumanVote === 'APPROVE' && countApproves() < 4) {
+    const swingOrder = [...aiPlayers].sort((a, b) => {
+      const aScore =
+        (a.id === game.leaderId ? 4 : 0) +
+        (proposedIds.includes(a.id) ? 2 : 0) +
+        (game.roleAssignments[a.id]?.roleId !== 'MERLIN' ? 1 : 0);
+      const bScore =
+        (b.id === game.leaderId ? 4 : 0) +
+        (proposedIds.includes(b.id) ? 2 : 0) +
+        (game.roleAssignments[b.id]?.roleId !== 'MERLIN' ? 1 : 0);
+      return bScore - aScore;
+    });
+    for (const idol of swingOrder) {
+      if (countApproves() >= 4) break;
+      if (allVotes[idol.id]?.vote !== 'APPROVE') {
+        allVotes[idol.id] = {
+          vote: 'APPROVE',
+          reason: `Backing Leader ${getPlayerName(game, game.leaderId)}'s Quest ${activeQuest.questNumber} proposal so we can test this squad on the board.`,
+          innerThought: `Swinging to APPROVE so Quest ${activeQuest.questNumber} can proceed and reveal mission card data.`
+        };
+      }
+    }
+  } else if (humanVote === 'REJECT' && !isHammer && countApproves() >= 4) {
+    const rejectSwingOrder = [...aiPlayers].sort((a, b) => {
+      const aOffTeam = !proposedIds.includes(a.id) && a.id !== game.leaderId ? 1 : 0;
+      const bOffTeam = !proposedIds.includes(b.id) && b.id !== game.leaderId ? 1 : 0;
+      return bOffTeam - aOffTeam;
+    });
+    for (const idol of rejectSwingOrder) {
+      if (countApproves() <= 3) break;
+      if (allVotes[idol.id]?.vote === 'APPROVE') {
+        allVotes[idol.id] = {
+          vote: 'REJECT',
+          reason: `Backing Guest's call to reject this lineup and rotate the Leader crown.`,
+          innerThought: `Aligning with table skepticism to reject this Quest ${activeQuest.questNumber} proposal and test the next Leader.`
+        };
+      }
+    }
+  }
 
   return allVotes;
 }
