@@ -34,6 +34,13 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:54 KST] Task 18: Responsive Mobile & Tablet Layout (`@media max-width: 960px`), Touch Scrolling & Sticky Quick-Jump Nav**
+  - **Action**:
+    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the mobile & tablet responsive layout (`<= 960px`), touch-scrolling unlock (`overflow-y: auto; -webkit-overflow-scrolling: touch;`), mobile section ordering (`order: 1..4`), and sticky quick-jump navigation bar (`🎥 Stage`, `💬 Chat`, `🔍 X-Ray`, `🎲 Role / Setup`).
+    2. Added `.mobile-quick-nav` inside `.server-rail` and section IDs (`#mainVideoStage`, `#leftChannelSidebar`) in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html).
+    3. Added complete `@media (max-width: 960px)` responsive rules in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css) so mobile viewports unlock vertical scrolling, prioritize the 8-tile `2×4` video stage (`aspect-ratio: 16 / 10`) at the top, place live chat/X-Ray immediately below, and prevent iOS Safari input auto-zoom (`font-size: 16px`).
+    4. Wired `.mobile-nav-pill` smooth scrolling and mobile-aware `setupChatDrawerResizer()` in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
+  - **Result**: Verified syntax (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.
 - **[2026-10-16 13:52 KST] Task 17: Pre-Generated 4K K-Pop Visual Center Portraits, Original Idol Stage Names & Detailed Namuwiki Character Lore (`나무위키 프로필`)**
   - **Action**:
     1. Generated, visually inspected, and installed 6 ultra-pretty 4K 16:9 K-Pop visual center studio portraits (`public/generated/portrait_idol_*.png`, 1.32 MB–1.55 MB each) with distinct styling details: **Seoyoung (`서영`)** (pearl hairclip, pink tweed, condenser mic), **Rina (`리나`)** (hime side-locks, silver hairpins & choker, neon booth), **Seol-ah (`설아`)** (black ribbon half-up hair, cream knit), **Yura (`유라`)** (high ponytail with pink satin ribbon, glitter aegyo-sal, pink-white pearl tweed jacket), **Chaerin (`채린`)** (chic dark-chocolate tassel bob cut, see-through bangs, black & silver jacket), and **Hana (`하나`)** (twin braids, star hairpins, pastel-blue cardigan, silver headphones).
@@ -60,10 +67,5 @@
     2. Added `#chatResizeHandle` to `#rightChatDrawer` in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), styled `.chat-resize-handle` and `.video-call-stage.compact-stage` (`2×4` responsive video grid when narrowed) in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and implemented `setupChatDrawerResizer()` in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so dragging the left edge of the chat window expands the chat and shrinks the video profile area without ever encroaching on the left settings sidebar.
     3. Removed `#mentionChipsRow` and `@Idol` calling logic across [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so all chat messages are broadcast openly to everyone in `#avalon-stage-7p`.
   - **Result**: Verified syntax (`node --check`) across all frontend/backend files, verified live on `http://localhost:8080`, and pushed to GitHub.
-- **[2026-10-16 13:21 KST] Task 13: Interactive Player Role Selection & Strict Epistemic Isolation**
-  - **Action**:
-    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) and [README.md](file:///c:/Users/Charlie/Business/Projects/mafia/README.md) to document that the Human Player can freely select their Avalon role (`RANDOM`, `MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`) while the remaining 6 roles from the official 7-player deck are cryptographically shuffled across the 6 AI Idols under strict Epistemic Isolation (`buildPrivatePlayerView`).
-    2. Added Role Selector in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), styled in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and wired in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) and [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js).
-    3. Verified across all 7 role options (`MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`, `RANDOM`) that the human player receives the exact requested role while neither the human nor the 6 AI Idols receive any information outside official Avalon Night Sight rules.
-  - **Result**: Verified locally (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.
+
 

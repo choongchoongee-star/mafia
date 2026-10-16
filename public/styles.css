@@ -156,6 +156,10 @@ body {
   letter-spacing: -0.02em;
 }
 
+.mobile-quick-nav {
+  display: none;
+}
+
 /* =========================================================================
    2. LEFT DISCORD CHANNEL & GAME STATE SIDEBAR (244px)
    ========================================================================= */
@@ -1580,4 +1584,278 @@ body {
   margin-top: 10px;
   font-size: 12px;
   color: #4ade80;
+}
+
+/* =========================================================================
+   5. RESPONSIVE MOBILE & TABLET LAYOUT (@media max-width: 960px)
+   Unlocks vertical touch scrolling & prioritizes Video Stage -> Chat -> Role Setup
+   ========================================================================= */
+@media (max-width: 960px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .discord-app,
+  .discord-app.chat-collapsed {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  /* Order 1: Sticky Top Mobile Navigation Bar */
+  .server-rail {
+    order: 1;
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 50px;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 10px;
+    gap: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(24, 25, 29, 0.96);
+    backdrop-filter: blur(10px);
+    overflow-x: auto;
+  }
+
+  .server-rail .server-icon {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  .server-rail .server-icon .server-pill,
+  .server-rail .rail-divider {
+    display: none;
+  }
+
+  .mobile-quick-nav {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    flex: 1;
+    min-width: 0;
+    padding: 2px 0;
+  }
+
+  .mobile-nav-pill {
+    background: #2b2d31;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+  }
+
+  .mobile-nav-pill.active,
+  .mobile-nav-pill:active {
+    background: var(--discord-blurple);
+    border-color: var(--discord-blurple);
+    color: #fff;
+  }
+
+  /* Order 2: Main 8-Tile Video Stage + Phase Action Bar + Call Dock */
+  .video-call-stage,
+  .video-call-stage.compact-stage {
+    order: 2;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 10px;
+    gap: 10px;
+    container-type: normal;
+    scroll-margin-top: 56px;
+  }
+
+  .stage-top-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .meeting-info-pill {
+    width: 100%;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .context-action-bar {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-radius: 10px;
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .context-instruction {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 12px;
+    line-height: 1.38;
+    text-align: center;
+  }
+
+  .context-buttons {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .action-cta-btn {
+    flex: 1 1 auto;
+    min-height: 36px;
+    font-size: 12px;
+    padding: 7px 12px;
+    text-align: center;
+  }
+
+  /* 2x4 Video Grid on Mobile with Explicit 16:10 Tile Aspect Ratio */
+  .video-grid-8,
+  .video-call-stage.compact-stage .video-grid-8 {
+    flex: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(4, auto);
+    gap: 8px;
+    width: 100%;
+  }
+
+  .zoom-tile {
+    aspect-ratio: 16 / 10;
+    min-height: 108px;
+    width: 100%;
+    touch-action: manipulation;
+  }
+
+  .tile-top-overlays {
+    top: 6px;
+    left: 6px;
+    right: 6px;
+  }
+
+  .tile-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .tile-bottom-pill {
+    bottom: 6px;
+    left: 6px;
+    padding: 3px 8px;
+    max-width: calc(100% - 12px);
+  }
+
+  .tile-participant-name {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tile-live-caption {
+    left: 6px;
+    right: 6px;
+    bottom: 30px;
+    font-size: 10.5px;
+    padding: 4px 7px;
+    -webkit-line-clamp: 2;
+  }
+
+  .call-controls-dock {
+    width: 100%;
+  }
+
+  .call-buttons-group {
+    width: 100%;
+    border-radius: 12px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .call-pill-btn,
+  .video-call-stage.compact-stage .call-pill-btn {
+    flex: 1 1 calc(33.33% - 6px);
+    min-height: 36px;
+    padding: 0 8px;
+    font-size: 11.5px;
+  }
+
+  /* Order 3: Voice Chat & Judge X-Ray Inspector */
+  .chat-drawer {
+    order: 3;
+    width: 100% !important;
+    min-width: 0;
+    height: 460px;
+    max-height: 74dvh;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    scroll-margin-top: 56px;
+  }
+
+  .chat-resize-handle {
+    display: none !important;
+  }
+
+  /* Prevent iOS Safari auto-zoom when tapping text inputs or role select */
+  .discord-text-input,
+  .role-select-dropdown,
+  .modal-input {
+    font-size: 16px !important;
+  }
+
+  /* Order 4: Quest Board, Secret Role & New Game Setup */
+  .channel-sidebar {
+    order: 4;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+    border-right: none;
+    padding-bottom: 28px;
+    scroll-margin-top: 56px;
+  }
+
+  .sidebar-scroll {
+    overflow: visible;
+    height: auto;
+  }
+
+  .modal-card {
+    width: calc(100vw - 24px);
+    max-width: 440px;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding: 16px;
+  }
 }

@@ -1,37 +1,42 @@
 # SUBMISSION.md — Google DeepMind AI Hackathon Submission Package
 
-## 1. Project Title & Track
-- **Title**: **IDOL AVALON LIVE — 7-Player Discord Party Play Social Deduction powered by Gemini 4 Argon**
+## 1. Official Submission Portal & Links
+- **Submission Portal**: [https://cerebralvalley.ai/e/google-deepmind-ai-hackathon](https://cerebralvalley.ai/e/google-deepmind-ai-hackathon) *(Deadline: **15:20 KST strictly enforced**)*
+- **Project Title**: `IDOL AVALON LIVE — 7-Player Discord Party Play Social Deduction powered by Gemini 4 Argon`
+- **Short Tagline / One-Line Pitch (< 140 chars)**:
+  `On-demand 7-player Avalon voice & video party game with 6 epistemic-isolated AI K-Pop idols powered by Gemini 4 Argon.`
 - **Primary Track**: **Track 1 — Gemini 4 Argon in Entertainment** *(Hybrid with Track 4 — Autonomous Agents)*
-- **Live Cloud Run URL**: `https://idol-avalon-live-oyxmbnqija-du.a.run.app`
+- **Live Google Cloud Run URL**: `https://idol-avalon-live-oyxmbnqija-du.a.run.app`
+- **Interactive Architecture & Judge Walkthrough**: `https://idol-avalon-live-oyxmbnqija-du.a.run.app/architecture.html`
 - **GitHub Repository**: `https://github.com/choongchoongee-star/mafia`
 
 ---
 
-## 2. English Project Description (Copy-Paste Ready for Submission Form)
+## 2. English Project Description (Copy-Paste Ready for Cerebral Valley Form)
 
 ### 2.1 Core Purpose: Solving the "Headcount Bottleneck" of Mafia & Social Deduction Games
 Social deduction games like *Mafia*, *Werewolf*, and *The Resistance: Avalon* are among the most thrilling party games ever created, but they suffer from a fundamental **cold-start headcount barrier**: you cannot play unless you gather **7 to 10 live people** in a Discord voice call at the exact same time. Traditional rule-based game bots fail to fill these seats because social deduction requires open-ended natural language bluffing, reading contradictions, and reasoning strictly under asymmetric hidden information.
 
-**IDOL AVALON LIVE** solves this headcount barrier using **Gemini 4 Argon (`gemini-4-argon`)**, transforming the classic 7-player hidden-role board game *The Resistance: Avalon* into an instant, on-demand **Discord Party Play (`#avalon-stage-7p` Voice & Video Call)** experience where **1 Human Player** joins **6 autonomous AI K-Pop Idols** (**Wonyoung, Karina, Sullyoon, Yuna, Chaewon, and Hanni**) and party moderator **MC Jae-suk**.
+**IDOL AVALON LIVE** solves this headcount barrier using **Gemini 4 Argon (`gemini-4-argon`)**, transforming the classic 7-player hidden-role board game *The Resistance: Avalon* into an instant, on-demand **Discord Party Play (`#avalon-stage-7p` Voice & Video Call)** experience where **1 Human Player** joins **6 autonomous AI K-Pop Idols** (**Seoyoung, Rina, Seol-ah, Yura, Chaerin, and Hana**—each with distinct regional dialects like Busan Satoori, Chungcheong Sarcasm, and Melbourne Aussie Slang) and party moderator **MC Jae-suk**.
 
-### 2.2 Multi-Agent Epistemic Isolation & Autonomous Verification
+### 2.2 Multi-Agent Epistemic Isolation, Parallel Floor Negotiation & Autonomous Verification
 Unlike text-only wrappers or scripted visual novels, **IDOL AVALON LIVE** combines:
-1. **Strict Epistemic Multi-Agent Isolation (`buildPrivatePlayerView`)**: Each of the 7 players is cryptographically dealt a hidden role (`Merlin`, `Percival`, `2 Loyal Servants of Arthur`, `Assassin`, `Morgana`, `Oberon`). Before every model invocation, `buildPrivatePlayerView()` constructs a mathematically isolated epistemic state so no AI agent ever sees unrevealed roles—forcing genuine Bayesian deduction, bluffing, and coordination.
-2. **Dual-Channel `gemini-4-argon` Deception & Reasoning**: Using the `@google/genai` Interactions API (`generation_config: { thinking_level: "low" | "medium" | "high" }`), each AI Idol simultaneously generates a hidden `privateInnerThought` (strategic calculation based on their secret role) and a `publicSpeech` (their voice-channel bluff or accusation).
-3. **Closed-Loop Epistemic & Rule Verification (`verifyAndHealUtterance`)**: Every AI utterance is audited against Avalon rules and epistemic constraints (e.g., preventing Merlin from self-revealing or Good players from claiming Evil). If a leak or rule hallucination is detected, `gemini-4-argon` automatically rewrites and heals the dialogue in-character before TTS synthesis.
-4. **Autonomous Timed Discord Stage & Bystander Silence Detector**: Every phase runs on a real party clock (`20s` Team Proposal, `75s` Live Discussion, `15s` Team Vote, `15s` Quest Execution). If the human player stays muted/silent, MC Jae-suk and the idols autonomously flag the human's "Bystander Strategy" and interrogate them live in `#avalon-stage-7p`.
-5. **7-Model Multimodal Pipeline**:
+1. **Interactive Role Choice + Strict Epistemic Multi-Agent Isolation (`buildPrivatePlayerView`)**: The human player can freely choose any Avalon role (`Merlin`, `Percival`, `Loyal Servant`, `Assassin`, `Morgana`, `Oberon`, or `Random`) while the remaining 6 roles from the official 7-player deck are cryptographically shuffled across the 6 AI Idols. Before every model invocation, `buildPrivatePlayerView()` constructs a mathematically isolated epistemic slice so neither the human nor any AI agent ever sees unrevealed roles—forcing genuine Bayesian deduction, bluffing, and role-shielding.
+2. **True 6-Agent Independent Parallel Floor Negotiation & Simultaneous Mic Clash**: Instead of a scripted round-robin speaker queue, all 6 AI idols independently evaluate their isolated `PrivatePlayerView` in parallel (`Promise.all`) to bid for the voice floor (`INTERRUPT`, `SPEAK`, or `HOLD_SILENT` with strategic silence). When two idols unmute simultaneously (`COLLISION_YIELD`), the yielding idol speaks a natural cut-off yield line (`"Oh sorry unnie, go ahead!"`) before handing the mic to the winning speaker.
+3. **Dual-Channel `gemini-4-argon` Deception & Reasoning**: Using the `@google/genai` Interactions API (`generation_config: { thinking_level: "low" | "medium" | "high" }`), each AI Idol simultaneously generates a hidden `privateInnerThought` (strategic calculation based on their secret role) and a `publicSpeech` (their voice-channel bluff or accusation).
+4. **Closed-Loop Epistemic & Rule Verification (`verifyAndHealUtterance`)**: Every AI utterance is audited against Avalon rules and epistemic constraints (e.g., preventing Merlin from self-revealing or Good players from claiming Evil). If a leak or rule hallucination is detected, `gemini-4-argon` automatically rewrites and heals the dialogue in-character before TTS synthesis.
+5. **Autonomous Timed Discord Stage & Bystander Silence Detector**: Every phase runs on a real party clock (`20s` Team Proposal, `75s` Live Discussion, `15s` Team Vote, `15s` Quest Execution). If the human player stays muted/silent, MC Jae-suk and the idols autonomously flag the human's "Bystander Strategy" and interrogate them live in `#avalon-stage-7p`.
+6. **7-Model Google DeepMind Multimodal Pipeline**:
    - **`gemini-4-argon`**: Primary Game Master, Quest team proposals (`thinking_level: "high"`), dual-channel idol deception (`"medium"`), closed-loop verification, and final Assassin Merlin shot.
-   - **`gemini-3.8-flash`**: Parallel 6-idol `APPROVE`/`REJECT` voting engine (`Promise.all`).
-   - **`gemini-nano-banana-2.1`**: Generates 4K photorealistic Discord video tile portraits.
-   - **`gemini-3.8-flash-tts`**: Synthesizes expressive character voice (`audio/wav`) with Discord green speaking-ring activation.
+   - **`gemini-3.8-flash`**: Parallel 6-idol floor bidding and simultaneous `APPROVE`/`REJECT` voting engine (`Promise.all`).
+   - **`gemini-nano-banana-2.1`**: Generates 4K photorealistic Korean studio portraits for all 7 Discord stage tiles.
+   - **`gemini-3.8-flash-tts`**: Synthesizes expressive character voice (`audio/wav`) with persona-specific pitch/rate prosody and Discord green speaking-ring activation.
    - **`gemini-3.5-transcribe`**: Bilingual (Korean/English) live microphone speech-to-text input.
    - **`lyria-3.5` (`lyria-3-clip-preview`)**: Phase-adaptive party background music (`discussion`, `vote`, `quest`, `assassin`).
    - **`gemini-omni-1.1-flash`**: Asynchronous video cutscene/reaction generation (`background: true`).
 
 ### 2.3 Hackathon Engineering Retrospective: Real-Time Video Generation vs. Debate Pacing
-Early in the hackathon sprint, we benchmarked live turn-by-turn video generation (`gemini-omni-1.1-flash`) for every spoken turn in the Discord voice call. However, we found that current end-to-end video generation latency is still too slow to match the rapid back-and-forth tempo of a live Mafia/Avalon debate. To preserve snappy conversational pacing during the hackathon, we made the pragmatic engineering decision to anchor the Discord video tiles on high-resolution studio portraits (`gemini-nano-banana-2.1`) paired with real-time voice synthesis (`gemini-3.8-flash-tts`) and Discord green speaking-ring feedback, while keeping video generation asynchronous (`background: true`).
+Early in the hackathon sprint, we benchmarked live turn-by-turn video generation (`gemini-omni-1.1-flash`) for every spoken turn in the Discord voice call. However, we found that current end-to-end video generation latency is still too slow to match the rapid back-and-forth tempo of a live Mafia/Avalon debate. To preserve snappy conversational pacing during the hackathon, we made the pragmatic engineering decision to anchor the Discord video tiles on high-resolution 4K studio portraits (`gemini-nano-banana-2.1`) paired with real-time voice synthesis (`gemini-3.8-flash-tts`) and Discord green speaking-ring feedback, while keeping video generation asynchronous (`background: true`).
 
 ### 2.4 Post-Hackathon Product Roadmap
 1. **Hybrid Discord Party Multiplayer ("Bring Your Friends, Fill the Rest with AI")**:
