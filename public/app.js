@@ -68,7 +68,7 @@ const state = {
   pendingAutoplayTurn: null
 };
 
-const MAX_BGM_LINEAR_GAIN = 0.045; // Even 100% slider is capped at a gentle 4.5% linear amplitude
+const MAX_BGM_LINEAR_GAIN = 0.025; // Capped at 2.5% linear amplitude (default 18% slider -> 0.0045 linear gain, ~-47 dB)
 
 /**
  * Ensures the shared Web Audio API `AudioContext`, `bgmGainNode`, `voiceGainNode`,
@@ -175,26 +175,25 @@ function setupAudioUnlockListeners() {
 }
 
 /**
- * Computes the effective linear BGM gain (0.0 to 0.045), applying automatic
- * 75% ducking (`* 0.25`) whenever a character TTS voice is speaking.
- * Default 18% slider -> 0.0081 idle gain (0.81% amplitude) and 0.0020 speaking gain (0.20% amplitude).
+ * Computes the effective linear BGM gain (0.0 to 0.025), applying gentle
+ * 35% ducking (`* 0.65`) with a smooth 0.45s ramp so BGM never pumps or pops between turns.
  * @returns {number}
  */
 function getEffectiveBgmGain() {
   if (!state.bgmEnabled || state.bgmUserPercent <= 0) return 0;
   const baseGain = (Math.min(100, Math.max(0, state.bgmUserPercent)) / 100) * MAX_BGM_LINEAR_GAIN;
-  return state.isBgmDucked ? baseGain * 0.25 : baseGain;
+  return state.isBgmDucked ? baseGain * 0.65 : baseGain;
 }
 
 /**
  * Applies the current BGM gain to both Web Audio `GainNode` (works on iOS Safari & Android)
- * and fallback `HTMLAudioElement.volume`.
+ * and fallback `HTMLAudioElement.volume` using a smooth 0.45s exponential time constant.
  */
 function applyBgmGain() {
   const gain = getEffectiveBgmGain();
   if (state.bgmGainNode && state.bgmAudioCtx) {
     try {
-      state.bgmGainNode.gain.setTargetAtTime(gain, state.bgmAudioCtx.currentTime, 0.06);
+      state.bgmGainNode.gain.setTargetAtTime(gain, state.bgmAudioCtx.currentTime, 0.45);
     } catch {
       state.bgmGainNode.gain.value = gain;
     }
@@ -205,12 +204,158 @@ function applyBgmGain() {
 }
 
 /**
- * Ducks BGM volume by 75% while any AI Idol or MC Jae-ho is speaking.
+ * Gently ducks BGM volume while any AI Idol or MC Jae-ho is speaking.
  * @param {boolean} isDucked
  */
 function setBgmDucking(isDucked) {
   state.isBgmDucked = Boolean(isDucked);
   applyBgmGain();
+}
+
+/**
+ * Converts a raw decoded 30s `AudioBuffer` into a 100% seamless, gapless circular loop buffer:
+ * 1. Trims 2.5s leading/trailing encoder & intro/outro transients.
+ * 2. Scans 200ms RMS energy windows to find the most uniform 15.0s continuous groove,
+ *    strictly rejecting any mid-track breakdown, hollow pause, or awkward dip.
+ * 3. Smoothly normalizes local RMS variations (`0.76x–1.32x` clamped moving average).
+ * 4. Applies a 3.0-second equal-power (`cos`/`sin`) circular crossfade so sample `N_loop - 1`
+ *    and sample `0` are exact consecutive samples from the recording (zero seam, zero click, zero dead air).
+ *
+ * @param {AudioContext} audioCtx
+ * @param {AudioBuffer} rawBuffer
+ * @returns {AudioBuffer}
+ */
+function createSeamlessLoopBuffer(audioCtx, rawBuffer) {
+  if (!audioCtx || !rawBuffer || rawBuffer.duration < 8) {
+    return rawBuffer;
+  }
+
+  const sr = rawBuffer.sampleRate;
+  const numChannels = rawBuffer.numberOfChannels;
+  const totalSamples = rawBuffer.length;
+
+  // 1. Trim intro and outro transients (2.5s head/tail)
+  const trimSec = Math.min(2.5, rawBuffer.duration * 0.12);
+  const bodyStart = Math.floor(trimSec * sr);
+  const bodyEnd = Math.max(bodyStart + Math.floor(6 * sr), totalSamples - Math.floor(trimSec * sr));
+  const bodyLength = bodyEnd - bodyStart;
+
+  // 2. Compute 200ms sliding frame RMS across the body
+  const frameSamples = Math.max(1, Math.floor(0.2 * sr));
+  const numFrames = Math.floor(bodyLength / frameSamples);
+  if (numFrames < 20) return rawBuffer;
+
+  const ch0 = rawBuffer.getChannelData(0);
+  const ch1 = numChannels > 1 ? rawBuffer.getChannelData(1) : ch0;
+  const frameRms = new Float32Array(numFrames);
+
+  for (let f = 0; f < numFrames; f += 1) {
+    const startIdx = bodyStart + f * frameSamples;
+    let sumSq = 0;
+    for (let i = 0; i < frameSamples; i += 1) {
+      const s = 0.5 * (ch0[startIdx + i] + ch1[startIdx + i]);
+      sumSq += s * s;
+    }
+    frameRms[f] = Math.sqrt(sumSq / frameSamples);
+  }
+
+  const sortedRms = Array.from(frameRms).sort((a, b) => a - b);
+  const medianRms = Math.max(1e-4, sortedRms[Math.floor(sortedRms.length * 0.55)]);
+
+  // Select the most uniform 15.0s continuous window (avoiding any mid-track breakdown/dip)
+  const targetRawSec = Math.min(15.0, (numFrames * frameSamples) / sr);
+  const winFrames = Math.max(16, Math.min(numFrames, Math.floor(targetRawSec / 0.2)));
+
+  let bestStartFrame = 0;
+  let bestPenalty = Infinity;
+
+  for (let startF = 0; startF <= numFrames - winFrames; startF += 1) {
+    let penalty = 0;
+    for (let k = 0; k < winFrames; k += 1) {
+      const r = frameRms[startF + k];
+      const ratio = r / medianRms;
+      if (ratio < 0.68) {
+        // Heavy penalty for any breakdown, drop-out, or hollow gap
+        const deficit = 0.68 - ratio;
+        penalty += deficit * deficit * 45;
+      } else if (ratio > 1.45) {
+        const excess = ratio - 1.45;
+        penalty += excess * excess * 12;
+      } else {
+        const dev = ratio - 1.0;
+        penalty += dev * dev;
+      }
+    }
+    // Prefer windows whose start and loop-wrap regions have closely matched energy
+    const seamDiff = Math.abs(frameRms[startF] - frameRms[startF + winFrames - 15]) / medianRms;
+    penalty += seamDiff * 3.5;
+
+    if (penalty < bestPenalty) {
+      bestPenalty = penalty;
+      bestStartFrame = startF;
+    }
+  }
+
+  // 3. Build smoothed per-frame envelope normalizer (5-frame = 1.0s moving average)
+  const rawLoopSamples = winFrames * frameSamples;
+  const segStartSample = bodyStart + bestStartFrame * frameSamples;
+  const frameGain = new Float32Array(winFrames);
+
+  for (let k = 0; k < winFrames; k += 1) {
+    let sumRms = 0;
+    let count = 0;
+    for (let d = -2; d <= 2; d += 1) {
+      const idx = Math.min(winFrames - 1, Math.max(0, k + d));
+      sumRms += frameRms[bestStartFrame + idx];
+      count += 1;
+    }
+    const localAvg = Math.max(1e-4, sumRms / count);
+    const rawCorrection = medianRms / localAvg;
+    frameGain[k] = Math.min(1.32, Math.max(0.76, rawCorrection));
+  }
+
+  // 4. Apply 3.0-second equal-power circular crossfade so sample (finalLoopSamples - 1) and sample 0 are adjacent
+  const xfadeSec = Math.min(3.0, (rawLoopSamples / sr) * 0.22);
+  const xfadeSamples = Math.floor(xfadeSec * sr);
+  const finalLoopSamples = rawLoopSamples - xfadeSamples;
+  if (finalLoopSamples <= sr * 3) return rawBuffer;
+
+  const loopBuffer = audioCtx.createBuffer(numChannels, finalLoopSamples, sr);
+
+  const getEnvelopeGainAtOffset = (offsetSample) => {
+    const exactFrame = offsetSample / frameSamples;
+    const f0 = Math.min(winFrames - 1, Math.max(0, Math.floor(exactFrame)));
+    const f1 = Math.min(winFrames - 1, f0 + 1);
+    const frac = exactFrame - f0;
+    return frameGain[f0] * (1 - frac) + frameGain[f1] * frac;
+  };
+
+  for (let ch = 0; ch < numChannels; ch += 1) {
+    const src = rawBuffer.getChannelData(ch);
+    const dst = loopBuffer.getChannelData(ch);
+
+    for (let i = 0; i < finalLoopSamples; i += 1) {
+      if (i < xfadeSamples) {
+        // Circular equal-power crossfade: at i=0, t=0 -> cos(0)=1 (tail sample finalLoopSamples), sin(0)=0
+        const t = i / xfadeSamples;
+        const angle = t * Math.PI * 0.5;
+        const fadeIn = Math.sin(angle);
+        const fadeOut = Math.cos(angle);
+
+        const headOffset = i;
+        const tailOffset = i + finalLoopSamples;
+
+        const headSample = src[segStartSample + headOffset] * getEnvelopeGainAtOffset(headOffset);
+        const tailSample = src[segStartSample + tailOffset] * getEnvelopeGainAtOffset(tailOffset);
+
+        dst[i] = headSample * fadeIn + tailSample * fadeOut;
+      } else {
+        dst[i] = src[segStartSample + i] * getEnvelopeGainAtOffset(i);
+      }
+    }
+  }
+
+  return loopBuffer;
 }
 
 /**
@@ -246,15 +391,64 @@ function preloadPortraitImages() {
 }
 
 /**
+ * Aborts any in-flight autonomous background `/discuss/step` poll so user-initiated
+ * chat or button actions execute immediately without waiting or being dropped.
+ */
+function abortPendingAutoStep() {
+  if (state.autoStepAbortController) {
+    try {
+      state.autoStepAbortController.abort();
+    } catch {
+      // Ignore abort errors
+    }
+    state.autoStepAbortController = null;
+    state.isBusyRequest = false;
+    state.isWaitingServer = false;
+  }
+}
+
+/**
+ * Updates `#humanChatInput.placeholder` dynamically per phase so the player knows
+ * they can operate every phase directly from the chat window.
+ */
+function updateChatInputPlaceholder() {
+  const inputEl = document.getElementById('humanChatInput');
+  if (!inputEl || !state.board) return;
+  const phase = state.board.phase;
+
+  if (phase === 'TEAM_PROPOSAL') {
+    if (state.board.leaderId === 'player_human') {
+      inputEl.placeholder = `Crown Leader: Type e.g. "서영이랑 나 가자" or "제안" (${state.board.requiredTeamSize}P)...`;
+    } else {
+      inputEl.placeholder = `Waiting on ${state.board.leaderName} — type "제안" to speed up...`;
+    }
+  } else if (phase === 'DISCUSSION') {
+    inputEl.placeholder = 'Debate in Korean/English, or type "투표 시작" / "찬성" / "반대"...';
+  } else if (phase === 'TEAM_VOTE') {
+    inputEl.placeholder = 'Team Vote: Type "찬성" (Approve) or "반대" (Reject)...';
+  } else if (phase === 'QUEST_EXECUTION') {
+    inputEl.placeholder = 'Quest Mission: Type "성공" (Success) or "실패" (Fail)...';
+  } else if (phase === 'ASSASSIN_PHASE') {
+    inputEl.placeholder = 'Assassin Shot: Type idol name e.g. "설아 암살" or "리나"...';
+  } else if (phase === 'GAME_OVER') {
+    inputEl.placeholder = 'Game Over: Type "새 게임" or "다시 시작" to play again...';
+  } else {
+    inputEl.placeholder = 'Message #avalon-stage-7p...';
+  }
+}
+
+/**
  * Starts a new 7-player Avalon game session on the server.
  * @param {'STANDARD'|'QUEST_4_CRITICAL'|'ASSASSIN_CLIMAX'} [demoPreset='STANDARD']
  * @param {string|null} [preferredRoleOverride=null]
  */
 async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = null) {
+  abortPendingAutoStep();
   const mySeq = (state.gameStartSeq || 0) + 1;
   state.gameStartSeq = mySeq;
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.pendingHumanChatQueue = [];
   state.selectedProposalIds.clear();
   stopActiveSpeech();
 
@@ -284,6 +478,8 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
 
     applyServerGameState(data);
     resetPhaseClock(data.board.phaseTimerSec);
+    // Release network lock immediately so user can click or chat while MC Jae-ho speaks!
+    state.isBusyRequest = false;
 
     if (data.latestTurn) {
       await playTurnVoiceAndHighlight(data.latestTurn);
@@ -304,7 +500,7 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
         ) {
           triggerTeamProposal([]);
         }
-      }, 1200);
+      }, 900);
     }
   } catch (err) {
     console.error('Error starting new game:', err);
@@ -358,13 +554,14 @@ function applyServerGameState(data) {
   renderZoomGrid();
   renderSidebarVoiceMembers();
   renderTranscriptAndXray();
+  updateChatInputPlaceholder();
   syncPhaseAdaptiveBgm();
 }
 
 /**
  * Synchronizes phase-adaptive background music (`lyria-3.5` / `lyria-3-clip-preview`)
- * using a Web Audio API `AudioBufferSourceNode` + `GainNode` pipeline so volume attenuation
- * works identically on desktop, Android, and iOS Safari (where `HTMLAudioElement.volume` is read-only).
+ * using a Web Audio API `AudioBufferSourceNode` + `createSeamlessLoopBuffer` + `GainNode` pipeline
+ * so BGM loops seamlessly with zero mid-track dropouts and identical volume attenuation across desktop and mobile.
  */
 async function syncPhaseAdaptiveBgm() {
   if (!state.board) return;
@@ -385,8 +582,14 @@ async function syncPhaseAdaptiveBgm() {
 
   state.currentBgmMood = mood;
 
-  if (state.playingBgmMood === mood && (state.bgmSourceNode || (state.bgmAudio && !state.bgmAudio.paused))) {
+  if (state.playingBgmMood === mood && state.bgmSourceNode) {
     applyBgmGain();
+    return;
+  }
+
+  // Wait for first user gesture to unlock Web Audio API so we never fall back to raw un-crossfaded <audio>
+  const hasWebAudioSupport = Boolean(window.AudioContext || window.webkitAudioContext);
+  if (hasWebAudioSupport && !state.audioUnlocked) {
     return;
   }
 
@@ -402,12 +605,13 @@ async function syncPhaseAdaptiveBgm() {
         ctx.resume().catch(() => {});
       }
 
-      let audioBuffer = state.bgmBufferCache.get(data.bgmUrl);
-      if (!audioBuffer) {
+      let seamlessBuffer = state.bgmBufferCache.get(data.bgmUrl);
+      if (!seamlessBuffer) {
         const audioRes = await fetch(data.bgmUrl);
         const arrayBuf = await audioRes.arrayBuffer();
-        audioBuffer = await state.bgmAudioCtx.decodeAudioData(arrayBuf);
-        state.bgmBufferCache.set(data.bgmUrl, audioBuffer);
+        const rawBuffer = await state.bgmAudioCtx.decodeAudioData(arrayBuf);
+        seamlessBuffer = createSeamlessLoopBuffer(state.bgmAudioCtx, rawBuffer);
+        state.bgmBufferCache.set(data.bgmUrl, seamlessBuffer);
       }
 
       if (!state.bgmEnabled || state.bgmUserPercent <= 0 || state.currentBgmMood !== mood) {
@@ -416,26 +620,13 @@ async function syncPhaseAdaptiveBgm() {
 
       stopBgmPlayback();
       const source = state.bgmAudioCtx.createBufferSource();
-      source.buffer = audioBuffer;
+      source.buffer = seamlessBuffer;
       source.loop = true;
       source.connect(state.bgmGainNode);
       applyBgmGain();
       source.start(0);
       state.bgmSourceNode = source;
       state.playingBgmMood = mood;
-      return;
-    }
-
-    // Fallback if Web Audio API is unavailable
-    if (!state.bgmAudio) {
-      state.bgmAudio = new Audio();
-      state.bgmAudio.loop = true;
-    }
-    applyBgmGain();
-    if (!state.bgmAudio.src.endsWith(data.bgmUrl)) {
-      state.bgmAudio.src = data.bgmUrl;
-      state.playingBgmMood = mood;
-      state.bgmAudio.play().catch(() => {});
     }
   } catch {
     // Ignore BGM fetch/decode errors
@@ -852,9 +1043,10 @@ function renderZoomGrid() {
         leftHtml.push('<span class="tile-badge leader-crown">✓ Selected</span>');
       }
       if (participant.dialectTag) {
+        const compactDialect = participant.dialectTag.replace(/\s*\([^)]*\)/g, '').trim();
         const mbtiShort = participant.namuwikiProfile?.mbti?.split(' ')[0] || '';
         leftHtml.push(
-          `<span class="tile-badge">${participant.dialectTag}${mbtiShort ? ` • ${mbtiShort}` : ''}</span>`
+          `<span class="tile-badge">${compactDialect}${mbtiShort ? ` • ${mbtiShort}` : ''}</span>`
         );
       }
     }
@@ -964,12 +1156,15 @@ function renderTranscriptAndXray() {
         const dialectHtml = item.dialectTag
           ? `<span class="msg-meta">${item.dialectTag}</span>`
           : '';
-        const floorBadgeHtml =
-          item.floorEventType === 'COLLISION_YIELD'
-            ? '<span class="msg-meta" style="color:#f59e0b">⚡ Mic Clash → Yielded</span>'
-            : item.floorEventType === 'COLLISION_WINNER'
-              ? '<span class="msg-meta" style="color:#4ade80">🎙️ Took Floor After Yield</span>'
-              : '';
+        const isYieldEvent =
+          item.floorEventType === 'COLLISION_YIELD' || item.floorEventType === 'MIC_CLASH_YIELD';
+        const isWinnerEvent =
+          item.floorEventType === 'COLLISION_WINNER' || item.floorEventType === 'MIC_CLASH_WINNER';
+        const floorBadgeHtml = isYieldEvent
+          ? '<span class="msg-meta" style="color:#f59e0b">⚡ Mic Clash → Yielded</span>'
+          : isWinnerEvent
+            ? '<span class="msg-meta" style="color:#4ade80">🎙️ Took Floor After Yield</span>'
+            : '';
 
         const replayBtnHtml =
           item.speakerId !== 'player_human'

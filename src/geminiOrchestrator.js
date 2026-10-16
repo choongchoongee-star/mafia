@@ -562,15 +562,30 @@ function buildDynamicLeaderProposalSpeech(game, privateView, candidateIds, teamN
  * @param {string|null} [options.humanMessage=null]
  * @param {string|null} [options.targetMemberId=null]
  * @param {number} [options.elapsedRoundSec=0]
+ * @param {string[]} [options.candidateTeamIds=[]]
  * @returns {Promise<object>} Generated and verified discussion turn (plus optional `yieldTurn`, `floorEvent`, `agentBids`)
  */
 export async function generateDiscussionDebateTurn(
   game,
-  { humanMessage = null, targetMemberId = null, elapsedRoundSec = 0 } = {}
+  { humanMessage = null, targetMemberId = null, elapsedRoundSec = 0, candidateTeamIds = [] } = {}
 ) {
   const activeQuest = getActiveQuest(game);
   const humanPlayer = game.players.find((p) => p.isHuman);
   const aiPlayers = game.players.filter((p) => !p.isHuman);
+  const isPreProposalPhase =
+    game.phase === 'TEAM_PROPOSAL' || game.proposedTeamIds.length === 0;
+  const effectiveTeamIds =
+    game.proposedTeamIds.length > 0
+      ? game.proposedTeamIds
+      : Array.isArray(candidateTeamIds)
+        ? candidateTeamIds
+        : [];
+
+  // When an AI Idol is Leader during TEAM_PROPOSAL, the other 5 idols lobby/pitch the AI Leader before she locks in her team
+  const biddingIdols =
+    isPreProposalPhase && game.leaderId !== 'player_human'
+      ? aiPlayers.filter((p) => p.id !== game.leaderId)
+      : aiPlayers;
 
   // Check if the Human Player is acting as a silent bystander this round
   const isBystanderSilent =
@@ -586,13 +601,15 @@ export async function generateDiscussionDebateTurn(
 
   // Step 1: Parallel 6-Agent Autonomous Floor Evaluation (each idol evaluates from her own isolated epistemic state)
   const rawAgentBids = await Promise.all(
-    aiPlayers.map((idol) =>
+    biddingIdols.map((idol) =>
       evaluateSingleIdolFloorBid(game, idol, {
         humanMessage,
         targetMemberId,
         isBystanderSilent,
         lastSpeakerId,
-        lastTargetId
+        lastTargetId,
+        effectiveTeamIds,
+        isPreProposalPhase
       })
     )
   );
@@ -711,7 +728,12 @@ export async function generateDiscussionDebateTurn(
   // Step 2: Generate high-depth Gemini 4 Argon dialogue for the winning speaker (and yield line if collision occurred)
   const winnerIdol = aiPlayers.find((p) => p.id === winnerBid.speakerId) || aiPlayers[0];
   const winnerPrivateView = buildPrivatePlayerView(game, winnerIdol.id);
-  const proposedNames = game.proposedTeamIds.map((id) => getPlayerName(game, id));
+  const proposedNames = effectiveTeamIds.map((id) => getPlayerName(game, id));
+  const teamStatusLine = isPreProposalPhase
+    ? proposedNames.length > 0
+      ? `Leader ${winnerPrivateView.boardSummary.leaderName} is currently selecting ${activeQuest.teamSize} members for Quest ${activeQuest.questNumber} (tentatively highlighting: [${proposedNames.join(', ')}])`
+      : `Leader ${winnerPrivateView.boardSummary.leaderName} is currently deciding which ${activeQuest.teamSize} members to pick for Quest ${activeQuest.questNumber} (TEAM_PROPOSAL lobbying phase)`
+    : `Leader ${winnerPrivateView.boardSummary.leaderName} proposed Team: [${proposedNames.join(', ')}]`;
 
   let yieldTurnPayload = null;
   let yieldTtsPromise = null;
@@ -753,6 +775,7 @@ YOUR CHARACTER & SECRET ROLE:
 - ${winnerPrivateView.epistemicVision.nightVisionText}
 
 MULTI-AGENT FLOOR CONTEXT RIGHT NOW:
+- Current Phase: ${game.phase}
 - Your Agent Floor Decision: ${winnerBid.intent} (Urgency: ${winnerBid.urgency}/100)
 - ${
     yielderBid
@@ -766,8 +789,8 @@ MULTI-AGENT FLOOR CONTEXT RIGHT NOW:
 CURRENT BOARD STATE:
 - Quest ${activeQuest.questNumber} (Team Size: ${activeQuest.teamSize}, Fails Required: ${activeQuest.failsRequired})
 - Score: Good ${winnerPrivateView.boardSummary.goodScore} vs Evil ${winnerPrivateView.boardSummary.evilScore} | Reject Track: ${winnerPrivateView.boardSummary.rejectTrack}/5
-- Leader ${winnerPrivateView.boardSummary.leaderName} proposed Team: [${proposedNames.join(', ')}]
-- Are YOU on the proposed team?: ${game.proposedTeamIds.includes(winnerIdol.id) ? 'YES' : 'NO'}
+- ${teamStatusLine}
+- Are YOU on/highlighted for the team?: ${effectiveTeamIds.includes(winnerIdol.id) ? 'YES' : 'NO'}
 - Your Bayesian Evil Suspicion Ranking: ${JSON.stringify(winnerPrivateView.suspicionRanking)}
 - Past Quest Results: ${JSON.stringify(winnerPrivateView.boardSummary.questHistory)}
 - Recent Live Conversation: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
@@ -776,8 +799,10 @@ ${
   humanMessage
     ? `CRITICAL LIVE INPUT: Special Guest (${humanPlayer.name}) just said to the room: "${humanMessage}". Respond DIRECTLY and specifically to what ${humanPlayer.name} just said while acting according to your secret role (${winnerPrivateView.self.roleName})!`
     : isBystanderSilent
-      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly—ask if they are hiding as Merlin or playing Oberon while commenting on [${proposedNames.join(', ')}]!`
-      : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
+      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly—ask if they are hiding as Merlin or playing Oberon!`
+      : isPreProposalPhase
+        ? `PRE-PROPOSAL LOBBYING: Lobby Leader ${winnerPrivateView.boardSummary.leaderName} right now before the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team is locked in! Pitch why YOU (or a trusted ally) should be picked—or warn ${winnerPrivateView.boardSummary.leaderName} who NOT to bring—using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
+        : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
 }
 
 STRICT ANTI-REPETITION & NATURAL DIALOGUE RULES:
@@ -907,11 +932,20 @@ function getIdolMentionOrderInMessage(humanMessage, game, idolId) {
 async function evaluateSingleIdolFloorBid(
   game,
   idol,
-  { humanMessage, targetMemberId, isBystanderSilent, lastSpeakerId, lastTargetId }
+  {
+    humanMessage,
+    targetMemberId,
+    isBystanderSilent,
+    lastSpeakerId,
+    lastTargetId,
+    effectiveTeamIds = [],
+    isPreProposalPhase = false
+  }
 ) {
   const privateView = buildPrivatePlayerView(game, idol.id);
   const role = privateView.self;
-  const proposedIds = game.proposedTeamIds;
+  const proposedIds =
+    effectiveTeamIds && effectiveTeamIds.length > 0 ? effectiveTeamIds : game.proposedTeamIds;
   const onTeam = proposedIds.includes(idol.id);
   const timesSpokenThisRound = game.speakerHistoryThisRound.filter(
     (id) => id === idol.id
@@ -931,7 +965,9 @@ async function evaluateSingleIdolFloorBid(
     idol,
     humanMessage,
     isBystanderSilent,
-    humanNamedMe
+    humanNamedMe,
+    proposedIds,
+    isPreProposalPhase
   );
 
   // Compute strategic urgency & intent based on secret Avalon role + situational triggers
@@ -1164,13 +1200,21 @@ function buildContextualDebateFallback(
   speaker,
   humanMessage,
   isBystanderSilent,
-  humanNamedMe = false
+  humanNamedMe = false,
+  effectiveTeamIds = [],
+  isPreProposalPhase = false
 ) {
   const role = privateView.self;
   const humanPlayer = game.players.find((p) => p.isHuman);
   const activeQuest = getActiveQuest(game);
-  const proposedIds = game.proposedTeamIds;
+  const proposedIds =
+    effectiveTeamIds && effectiveTeamIds.length > 0 ? effectiveTeamIds : game.proposedTeamIds;
   const proposedNames = proposedIds.map((id) => getPlayerName(game, id));
+  const leaderName = getPlayerName(game, game.leaderId);
+  const teamLabel =
+    proposedNames.length > 0
+      ? `[${proposedNames.join(', ')}]`
+      : `the Quest ${activeQuest.questNumber} squad`;
 
   // Find most suspicious player on the proposed team from speaker's epistemic view
   const teamSuspects = privateView.suspicionRanking.filter(
@@ -1191,7 +1235,7 @@ function buildContextualDebateFallback(
         innerThought: `As ${role.roleName} (Evil), ${humanPlayer.name} just said "${cleanMsg}". I'm jumping in (${humanNamedMe ? 'since my name was called!' : 'to steer the room'}) to deflect suspicion onto ${topTeamSuspect.playerName} while sounding like a loyal Good Citizen.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `${calloutPrefix}—on [${proposedNames.join(', ')}], you can trust me 100%, but ${topTeamSuspect.playerName}'s vote track for Quest ${activeQuest.questNumber} is super suspicious!`,
+          `${calloutPrefix}—for ${teamLabel}, you can trust me 100%, but ${topTeamSuspect.playerName}'s behavior for Quest ${activeQuest.questNumber} is super suspicious!`,
           humanPlayer.name
         ),
         emotion: isQuestion ? 'speaking' : 'suspicious',
@@ -1202,7 +1246,7 @@ function buildContextualDebateFallback(
       innerThought: `As ${role.roleName} (Good), ${humanPlayer.name} raised a live point ("${cleanMsg}"). Cross-checking against my suspicion matrix where ${topTeamSuspect.playerName} sits at ${Math.round(topTeamSuspect.evilProbability * 100)}% Evil probability.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `${calloutPrefix}—looking at [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}, my biggest red flag is still ${topTeamSuspect.playerName}!`,
+        `${calloutPrefix}—looking at ${teamLabel} for Quest ${activeQuest.questNumber}, my biggest red flag is still ${topTeamSuspect.playerName}!`,
         topTeamSuspect.playerName
       ),
       emotion: 'speaking',
@@ -1216,11 +1260,52 @@ function buildContextualDebateFallback(
       innerThought: `As ${role.roleName}, I notice ${humanPlayer.name} hasn't spoken a single word this round. Silent bystanders are either Merlin hiding from the Assassin or Oberon watching us clash.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `${humanPlayer.name} hasn't said a single word this whole round—are you staying quiet because you're Merlin hiding from the Assassin, or Oberon watching us fight over [${proposedNames.join(', ')}]?!`,
+        `${humanPlayer.name} hasn't said a single word this whole round—are you staying quiet because you're Merlin hiding from the Assassin, or Oberon watching us fight over ${teamLabel}?!`,
         humanPlayer.name
       ),
       emotion: 'suspicious',
       targetPlayerId: humanPlayer.id
+    };
+  }
+
+  // Case B2: Pre-Proposal Lobbying during TEAM_PROPOSAL before the Leader locks in the Quest team!
+  if (isPreProposalPhase) {
+    if (role.roleId === 'MERLIN') {
+      const evilTargetId =
+        privateView.epistemicVision.knownEvilIds[0] || topTeamSuspect.playerId;
+      const evilTargetName = getPlayerName(game, evilTargetId);
+      return {
+        innerThought: `As Merlin during TEAM_PROPOSAL, I must subtly lobby Leader ${leaderName} not to include ${evilTargetName} (known Evil) on the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team.`,
+        text: stylizeWithIdolDialect(
+          speaker.id,
+          `Leader ${leaderName}, before you lock in the ${activeQuest.teamSize} spots for Quest ${activeQuest.questNumber}, I'd be very careful about bringing ${evilTargetName}—put me on the squad instead so we get clean data!`,
+          leaderName
+        ),
+        emotion: 'suspicious',
+        targetPlayerId: game.leaderId
+      };
+    }
+    if (role.alignment === 'EVIL') {
+      return {
+        innerThought: `As ${role.roleName} (Evil) during TEAM_PROPOSAL, I'm lobbying Leader ${leaderName} to put me on the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} squad while casting doubt on ${topTeamSuspect.playerName}.`,
+        text: stylizeWithIdolDialect(
+          speaker.id,
+          `Leader ${leaderName}, pick me for one of the ${activeQuest.teamSize} seats on Quest ${activeQuest.questNumber}—I'm ready to prove I'm Good, whereas ${topTeamSuspect.playerName} has been acting way too cagey!`,
+          leaderName
+        ),
+        emotion: 'speaking',
+        targetPlayerId: game.leaderId
+      };
+    }
+    return {
+      innerThought: `As ${role.roleName} (Good) during TEAM_PROPOSAL, I'm pitching Leader ${leaderName} to include me on the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team and keep ${topTeamSuspect.playerName} off.`,
+      text: stylizeWithIdolDialect(
+        speaker.id,
+        `Leader ${leaderName}, since we need ${activeQuest.teamSize} clean players for Quest ${activeQuest.questNumber}, take me with you and think twice before giving ${topTeamSuspect.playerName} a spot!`,
+        leaderName
+      ),
+      emotion: 'speaking',
+      targetPlayerId: game.leaderId
     };
   }
 
