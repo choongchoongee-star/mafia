@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20261016-mobile-ready-2" />
+  <link rel="stylesheet" href="/styles.css?v=20261016-bgm-low-1" />
 </head>
 <body>
   <div class="discord-app" id="discordApp">
@@ -232,14 +232,31 @@
             <span>My Cam</span>
           </button>
 
-          <button type="button" id="audioToggleBtn" class="call-pill-btn active" title="Toggle AI Character Voices (TTS) &amp; BGM">
+          <button type="button" id="audioToggleBtn" class="call-pill-btn active" title="Toggle AI Character Voices (TTS)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
               <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
             </svg>
-            <span id="audioToggleLabel">Audio ON</span>
+            <span id="audioToggleLabel">Voice ON</span>
           </button>
+
+          <div class="bgm-control-pill" title="Adjust or Mute Studio Background Music (BGM)">
+            <button type="button" id="bgmToggleBtn" class="bgm-toggle-inner active" aria-label="Toggle BGM">
+              <span>🎵</span>
+              <span id="bgmToggleLabel">BGM 18%</span>
+            </button>
+            <input
+              type="range"
+              id="bgmVolumeSlider"
+              class="bgm-volume-slider"
+              min="0"
+              max="100"
+              step="1"
+              value="18"
+              aria-label="BGM Volume"
+            />
+          </div>
 
           <button type="button" id="judgeXrayToggleBtn" class="call-pill-btn" title="Open Judge X-Ray Inspector (True Roles, Inner Monologues, Verification)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -363,6 +380,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=20261016-mobile-ready-2"></script>
+  <script type="module" src="/app.js?v=20261016-bgm-low-1"></script>
 </body>
 </html>

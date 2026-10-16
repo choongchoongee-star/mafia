@@ -34,6 +34,12 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 14:03 KST] Task 19: Web Audio API `GainNode` BGM Attenuation (`0.008` Default Gain), Speech Auto-Ducking (`25%`), & Dedicated `🎵 BGM` Toggle + Slider**
+  - **Action**:
+    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the Web Audio API `GainNode` BGM pipeline, ultra-low default ambient gain (`0.0081`), automatic 75% ducking (`0.0020`) during TTS speech, and independent BGM toggle/slider.
+    2. Replaced raw `HTMLAudioElement` BGM playback in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`syncPhaseAdaptiveBgm`) with a Web Audio API `AudioBufferSourceNode` + `GainNode` pipeline so volume attenuation works identically on desktop, Android, and iOS Safari (where `HTMLAudioElement.volume` is read-only and forced to `1.0`).
+    3. Lowered default BGM volume to `0.0081` (`0.81%` linear amplitude, `-41.8 dB`, ~10x quieter than the old `0.08` and ~120x quieter than iOS `1.0`), added automatic 75% ducking (`0.0020` gain) in `playTurnVoiceAndHighlight()` whenever any character speaks, and added an independent **`🎵 BGM` ON/OFF toggle + compact volume slider (`#bgmToggleBtn` + `#bgmVolumeSlider`)** in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html) and [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css).
+  - **Result**: Verified syntax (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.
 - **[2026-10-16 13:54 KST] Task 18: Responsive Mobile & Tablet Layout (`@media max-width: 960px`), Touch Scrolling & Sticky Quick-Jump Nav**
   - **Action**:
     1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the mobile & tablet responsive layout (`<= 960px`), touch-scrolling unlock (`overflow-y: auto; -webkit-overflow-scrolling: touch;`), mobile section ordering (`order: 1..4`), and sticky quick-jump navigation bar (`🎥 Stage`, `💬 Chat`, `🔍 X-Ray`, `🎲 Role / Setup`).
@@ -61,11 +67,3 @@
        - **Zone 2 (Top Context Action Bar — `#phaseActionBanner`)**: All in-game phase progression buttons (`Propose Team`, `⏭️ Next Idol Turn`, `🗳️ Start Vote`, `✅ Approve / ❌ Reject`, `✅ Success / 🗡️ Fail`, `🗡️ Resolve Assassin Shot`, `🔄 Play Again`).
        - **Zone 3 (Bottom Call Controls Dock — `.call-controls-dock`)**: 5 labeled pill buttons (`Voice Mic`, `My Cam`, `Audio ON/OFF`, `X-Ray`, `Side Panel`).
   - **Result**: Verified syntax (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.
-- **[2026-10-16 13:34 KST] Task 14: Resizable Chat Drawer vs. Video Stage (`#chatResizeHandle`), Open Table-Talk Rule (Removed `@Idol` Calling), & Fast Text-Only Mode (`skipTts`)**
-  - **Action**:
-    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the draggable `#chatResizeHandle` splitter, fixed-width left sidebar (`64px + 244px`), open table-talk rule (no `@Idol` targeted calling), and `💬 Text-Only Mode` (`skipTts`).
-    2. Added `#chatResizeHandle` to `#rightChatDrawer` in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), styled `.chat-resize-handle` and `.video-call-stage.compact-stage` (`2×4` responsive video grid when narrowed) in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and implemented `setupChatDrawerResizer()` in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so dragging the left edge of the chat window expands the chat and shrinks the video profile area without ever encroaching on the left settings sidebar.
-    3. Removed `#mentionChipsRow` and `@Idol` calling logic across [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so all chat messages are broadcast openly to everyone in `#avalon-stage-7p`.
-  - **Result**: Verified syntax (`node --check`) across all frontend/backend files, verified live on `http://localhost:8080`, and pushed to GitHub.
-
-

@@ -31,6 +31,9 @@ const state = {
   activeSpeechCharIndex: 0,
   activeTargetPlayerId: null,
   audioEnabled: true,
+  bgmEnabled: true,
+  bgmUserPercent: 18,
+  isBgmDucked: false,
   roleMasked: false,
   spoilersRevealed: false,
   localPhaseRemainingSec: 45,
@@ -46,8 +49,73 @@ const state = {
   activeVideoStreams: new Map(),
   humanWebcamStream: null,
   bgmAudio: null,
-  currentBgmMood: null
+  bgmAudioCtx: null,
+  bgmGainNode: null,
+  bgmSourceNode: null,
+  bgmBufferCache: new Map(),
+  currentBgmMood: null,
+  playingBgmMood: null
 };
+
+const MAX_BGM_LINEAR_GAIN = 0.045; // Even 100% slider is capped at a gentle 4.5% linear amplitude
+
+/**
+ * Computes the effective linear BGM gain (0.0 to 0.045), applying automatic
+ * 75% ducking (`* 0.25`) whenever a character TTS voice is speaking.
+ * Default 18% slider -> 0.0081 idle gain (0.81% amplitude) and 0.0020 speaking gain (0.20% amplitude).
+ * @returns {number}
+ */
+function getEffectiveBgmGain() {
+  if (!state.bgmEnabled || state.bgmUserPercent <= 0) return 0;
+  const baseGain = (Math.min(100, Math.max(0, state.bgmUserPercent)) / 100) * MAX_BGM_LINEAR_GAIN;
+  return state.isBgmDucked ? baseGain * 0.25 : baseGain;
+}
+
+/**
+ * Applies the current BGM gain to both Web Audio `GainNode` (works on iOS Safari & Android)
+ * and fallback `HTMLAudioElement.volume`.
+ */
+function applyBgmGain() {
+  const gain = getEffectiveBgmGain();
+  if (state.bgmGainNode && state.bgmAudioCtx) {
+    try {
+      state.bgmGainNode.gain.setTargetAtTime(gain, state.bgmAudioCtx.currentTime, 0.06);
+    } catch {
+      state.bgmGainNode.gain.value = gain;
+    }
+  }
+  if (state.bgmAudio) {
+    state.bgmAudio.volume = Math.min(1, Math.max(0, gain));
+  }
+}
+
+/**
+ * Ducks BGM volume by 75% while any AI Idol or MC Jae-ho is speaking.
+ * @param {boolean} isDucked
+ */
+function setBgmDucking(isDucked) {
+  state.isBgmDucked = Boolean(isDucked);
+  applyBgmGain();
+}
+
+/**
+ * Stops active BGM playback immediately.
+ */
+function stopBgmPlayback() {
+  if (state.bgmSourceNode) {
+    try {
+      state.bgmSourceNode.stop();
+      state.bgmSourceNode.disconnect();
+    } catch {
+      // Ignore already stopped source
+    }
+    state.bgmSourceNode = null;
+  }
+  if (state.bgmAudio) {
+    state.bgmAudio.pause();
+  }
+  state.playingBgmMood = null;
+}
 
 /**
  * Preloads the 4K Korean K-Pop idol & MC Jae-suk portraits from `/generated/`.
@@ -162,40 +230,89 @@ function applyServerGameState(data) {
 }
 
 /**
- * Synchronizes phase-adaptive background music (`lyria-3.5` / `lyria-3-clip-preview`).
+ * Synchronizes phase-adaptive background music (`lyria-3.5` / `lyria-3-clip-preview`)
+ * using a Web Audio API `AudioBufferSourceNode` + `GainNode` pipeline so volume attenuation
+ * works identically on desktop, Android, and iOS Safari (where `HTMLAudioElement.volume` is read-only).
  */
 async function syncPhaseAdaptiveBgm() {
-  if (!state.board || !state.audioEnabled) return;
+  if (!state.board) return;
+  if (!state.bgmEnabled || state.bgmUserPercent <= 0) {
+    stopBgmPlayback();
+    return;
+  }
+
   const phase = state.board.phase;
   const mood =
     phase === 'ASSASSIN_PHASE' || state.board.currentQuestNumber >= 4
-      ? 'climax'
-      : phase === 'TEAM_VOTE' || phase === 'QUEST_EXECUTION'
-        ? 'suspense'
-        : 'discussion';
+      ? 'assassin'
+      : phase === 'QUEST_EXECUTION'
+        ? 'quest'
+        : phase === 'TEAM_VOTE'
+          ? 'vote'
+          : 'discussion';
 
-  if (state.currentBgmMood === mood && state.bgmAudio && !state.bgmAudio.paused) {
+  state.currentBgmMood = mood;
+
+  if (state.playingBgmMood === mood && (state.bgmSourceNode || (state.bgmAudio && !state.bgmAudio.paused))) {
+    applyBgmGain();
     return;
   }
-  state.currentBgmMood = mood;
 
   try {
     const res = await fetch(`/api/media/bgm?mood=${encodeURIComponent(mood)}`);
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.bgmUrl || !state.audioEnabled) return;
+    if (!data.bgmUrl || !state.bgmEnabled || state.bgmUserPercent <= 0) return;
 
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      if (!state.bgmAudioCtx) {
+        state.bgmAudioCtx = new AudioCtx();
+        state.bgmGainNode = state.bgmAudioCtx.createGain();
+        state.bgmGainNode.gain.value = getEffectiveBgmGain();
+        state.bgmGainNode.connect(state.bgmAudioCtx.destination);
+      }
+      if (state.bgmAudioCtx.state === 'suspended') {
+        state.bgmAudioCtx.resume().catch(() => {});
+      }
+
+      let audioBuffer = state.bgmBufferCache.get(data.bgmUrl);
+      if (!audioBuffer) {
+        const audioRes = await fetch(data.bgmUrl);
+        const arrayBuf = await audioRes.arrayBuffer();
+        audioBuffer = await state.bgmAudioCtx.decodeAudioData(arrayBuf);
+        state.bgmBufferCache.set(data.bgmUrl, audioBuffer);
+      }
+
+      if (!state.bgmEnabled || state.bgmUserPercent <= 0 || state.currentBgmMood !== mood) {
+        return;
+      }
+
+      stopBgmPlayback();
+      const source = state.bgmAudioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.loop = true;
+      source.connect(state.bgmGainNode);
+      applyBgmGain();
+      source.start(0);
+      state.bgmSourceNode = source;
+      state.playingBgmMood = mood;
+      return;
+    }
+
+    // Fallback if Web Audio API is unavailable
     if (!state.bgmAudio) {
       state.bgmAudio = new Audio();
       state.bgmAudio.loop = true;
-      state.bgmAudio.volume = 0.08;
     }
+    applyBgmGain();
     if (!state.bgmAudio.src.endsWith(data.bgmUrl)) {
       state.bgmAudio.src = data.bgmUrl;
+      state.playingBgmMood = mood;
       state.bgmAudio.play().catch(() => {});
     }
   } catch {
-    // Ignore BGM fetch errors
+    // Ignore BGM fetch/decode errors
   }
 }
 
@@ -1118,16 +1235,21 @@ function playTurnVoiceAndHighlight(turn) {
     });
   }
 
+  setBgmDucking(true);
+
   if (turn.audioBase64) {
     try {
       return new Promise((resolve) => {
         const audio = new Audio(`data:${turn.audioMimeType || 'audio/wav'};base64,${turn.audioBase64}`);
+        audio.volume = 1.0;
         let settled = false;
         const finish = () => {
           if (settled) return;
           settled = true;
           if (state.activeSpeakerId === turn.speakerId) {
             clearActiveSpeakerState();
+          } else {
+            setBgmDucking(false);
           }
           resolve();
         };
@@ -1182,6 +1304,8 @@ function playTurnVoiceAndHighlight(turn) {
           settled = true;
           if (state.activeSpeakerId === turn.speakerId) {
             clearActiveSpeakerState();
+          } else {
+            setBgmDucking(false);
           }
           resolve();
         };
@@ -1196,6 +1320,7 @@ function playTurnVoiceAndHighlight(turn) {
     }
   }
 
+  setBgmDucking(false);
   return Promise.resolve();
 }
 
@@ -1203,6 +1328,7 @@ function clearActiveSpeakerState() {
   state.activeSpeakerId = null;
   state.activeSpeechText = '';
   state.activeTargetPlayerId = null;
+  setBgmDucking(false);
   renderZoomGrid();
   renderSidebarVoiceMembers();
 }
@@ -1720,20 +1846,84 @@ function initApp() {
     toggleHumanWebcam();
   });
 
-  // Zone 3: Bottom Dock — Voice & TTS Audio Toggle
+  // Zone 3: Bottom Dock — AI Character Voice (TTS) Toggle
   document.getElementById('audioToggleBtn')?.addEventListener('click', (e) => {
     state.audioEnabled = !state.audioEnabled;
     e.currentTarget.classList.toggle('active', state.audioEnabled);
     const labelEl = document.getElementById('audioToggleLabel');
     if (labelEl) {
-      labelEl.textContent = state.audioEnabled ? 'Audio ON' : 'Audio OFF';
+      labelEl.textContent = state.audioEnabled ? 'Voice ON' : 'Voice OFF';
     }
     if (!state.audioEnabled) {
       stopActiveSpeech();
-      if (state.bgmAudio) state.bgmAudio.pause();
+    }
+  });
+
+  // Zone 3: Bottom Dock — Independent BGM Toggle & Volume Slider
+  const bgmToggleBtn = document.getElementById('bgmToggleBtn');
+  const bgmToggleLabel = document.getElementById('bgmToggleLabel');
+  const bgmVolumeSlider = document.getElementById('bgmVolumeSlider');
+
+  const updateBgmControlUI = () => {
+    const active = state.bgmEnabled && state.bgmUserPercent > 0;
+    bgmToggleBtn?.classList.toggle('active', active);
+    if (bgmToggleLabel) {
+      bgmToggleLabel.textContent = active ? `BGM ${state.bgmUserPercent}%` : 'BGM OFF';
+    }
+    if (bgmVolumeSlider) {
+      bgmVolumeSlider.value = String(active ? state.bgmUserPercent : 0);
+    }
+  };
+
+  try {
+    const savedPct = window.localStorage?.getItem('avalon_bgm_percent');
+    const savedEnabled = window.localStorage?.getItem('avalon_bgm_enabled');
+    if (savedPct !== null) {
+      state.bgmUserPercent = Math.min(100, Math.max(0, Number(savedPct) || 0));
+    }
+    if (savedEnabled !== null) {
+      state.bgmEnabled = savedEnabled === 'true';
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+  updateBgmControlUI();
+
+  bgmToggleBtn?.addEventListener('click', () => {
+    if (state.bgmEnabled && state.bgmUserPercent > 0) {
+      state.bgmEnabled = false;
+      stopBgmPlayback();
     } else {
+      state.bgmEnabled = true;
+      if (state.bgmUserPercent <= 0) state.bgmUserPercent = 18;
       syncPhaseAdaptiveBgm();
     }
+    try {
+      window.localStorage?.setItem('avalon_bgm_enabled', String(state.bgmEnabled));
+      window.localStorage?.setItem('avalon_bgm_percent', String(state.bgmUserPercent));
+    } catch {
+      // Ignore localStorage errors
+    }
+    updateBgmControlUI();
+  });
+
+  bgmVolumeSlider?.addEventListener('input', (e) => {
+    const val = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+    state.bgmUserPercent = val;
+    state.bgmEnabled = val > 0;
+    if (!state.bgmEnabled) {
+      stopBgmPlayback();
+    } else {
+      applyBgmGain();
+      syncPhaseAdaptiveBgm();
+    }
+    try {
+      window.localStorage?.setItem('avalon_bgm_enabled', String(state.bgmEnabled));
+      window.localStorage?.setItem('avalon_bgm_percent', String(state.bgmUserPercent));
+    } catch {
+      // Ignore localStorage errors
+    }
+    updateBgmControlUI();
   });
 
   // Zone 3: Bottom Dock — Open Judge X-Ray Inspector
