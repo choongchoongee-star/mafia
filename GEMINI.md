@@ -34,6 +34,12 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:21 KST] Task 13: Interactive Player Role Selection & Strict Epistemic Isolation**
+  - **Action**:
+    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) and [README.md](file:///c:/Users/Charlie/Business/Projects/mafia/README.md) to document that the Human Player can freely select their Avalon role (`RANDOM`, `MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`) while the remaining 6 roles from the official 7-player deck are cryptographically shuffled across the 6 AI Idols under strict Epistemic Isolation (`buildPrivatePlayerView`).
+    2. Added dual synchronized Role Selectors (`#preferredRoleSelect` + `#roleQuickChips` quick role buttons in the left sidebar `#secretRoleCard`, plus `#stageRoleSelect` in the top stage bar) in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), styled in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and wired in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) and [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js).
+    3. Verified across all 7 role options (`MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`, `RANDOM`) that the human player receives the exact requested role while neither the human nor the 6 AI Idols receive any information outside official Avalon Night Sight rules.
+  - **Result**: Verified locally (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.
 - **[2026-10-16 13:20 KST] Task 12: High-Resolution Static Korean K-Pop Idol & MC Jae-suk Portraits + 6-Agent Independent Multi-Agent Floor Negotiation + Regional Dialects**
   - **Action**:
     1. Pivoted visual presentation from artificial video warping / low-quality stock videos to **7 crisp, high-resolution static Korean K-Pop Idol & MC Jae-suk studio portraits** (`public/generated/portrait_mc_jaesuk.png` and `public/generated/portrait_idol_*.png`, 1.2–1.55 MB each) rendered with a steady `1.15x` center crop (`drawPhotorealisticWebcamTile`) on the 8-Tile Discord/Zoom Stage.
@@ -52,6 +58,4 @@
 - **[2026-10-16 13:03 KST] Task 9: Live `.env` Verification, Lyria 3.5 Adaptive BGM API & Microphone Voice Input (`gemini-3.5-transcribe`)**
   - **Action**: Verified live `GEMINI_API_KEY` in [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env), implemented [`generateAdaptiveBgmLoop`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) (`lyria-3-clip-preview`), and upgraded [`transcribePlayerAudio`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) (`gemini-3.5-transcribe`).
   - **Result**: All companion model endpoints verified live on `http://localhost:8080`.
-- **[2026-10-16 12:46 KST] Task 8: Google Cloud Run Live Deployment (`h2gdm-hack26icn-2666`)**
-  - **Action**: Deployed `idol-avalon-live` to Cloud Run (`asia-northeast3`) on project `h2gdm-hack26icn-2666` with public access and `GEMINI_API_KEY` configured.
-  - **Result**: Live Cloud Run URL active at `https://idol-avalon-live-oyxmbnqija-du.a.run.app`.
+

@@ -328,7 +328,11 @@ export function createAvalonGame({
   const roleAssignments = {};
   const normalizedPref = String(preferredRole || 'RANDOM').toUpperCase();
   const targetRoleId =
-    normalizedPref === 'LOYAL_SERVANT' ? 'LOYAL_SERVANT_1' : normalizedPref;
+    normalizedPref === 'LOYAL_SERVANT'
+      ? crypto.randomInt(0, 2) === 0
+        ? 'LOYAL_SERVANT_1'
+        : 'LOYAL_SERVANT_2'
+      : normalizedPref;
   const preferredRoleObj = AVALON_ROLES_7P.find((r) => r.roleId === targetRoleId);
 
   if (preferredRoleObj && normalizedPref !== 'RANDOM') {
@@ -400,6 +404,7 @@ export function createAvalonGame({
     gameId,
     createdAt: new Date().toISOString(),
     demoPreset,
+    preferredRole: preferredRoleObj && normalizedPref !== 'RANDOM' ? normalizedPref : 'RANDOM',
     mcHost: { ...MC_HOST_PROFILE, currentExpression: 'speaking' },
     players: allPlayers,
     roleAssignments, // NEVER exposed directly to AI prompts or public state!
@@ -665,6 +670,7 @@ export function getPublicBoardSummary(game) {
 
   return {
     gameId: game.gameId,
+    preferredRole: game.preferredRole || 'RANDOM',
     phase: game.phase,
     phaseTimerSec: game.phaseTimerSec,
     remainingSec,
