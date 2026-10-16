@@ -70,11 +70,17 @@ body {
 
 /* Main Discord Shell Layout */
 .discord-app {
+  --chat-drawer-width: 360px;
   display: grid;
-  grid-template-columns: 64px 244px 1fr 324px;
+  grid-template-columns: 64px 244px minmax(260px, 1fr) var(--chat-drawer-width, 360px);
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+}
+
+.discord-app.resizing-chat {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .discord-app.chat-collapsed {
@@ -89,6 +95,8 @@ body {
    1. FAR-LEFT DISCORD SERVER ICON RAIL (64px)
    ========================================================================= */
 .server-rail {
+  width: 64px;
+  min-width: 64px;
   background: var(--bg-server-rail);
   display: flex;
   flex-direction: column;
@@ -152,6 +160,8 @@ body {
    2. LEFT DISCORD CHANNEL & GAME STATE SIDEBAR (244px)
    ========================================================================= */
 .channel-sidebar {
+  width: 244px;
+  min-width: 244px;
   background: var(--bg-sidebar);
   display: flex;
   flex-direction: column;
@@ -487,10 +497,10 @@ body {
 .role-picker-box {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-bottom: 8px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 7px;
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .role-picker-label {
@@ -504,7 +514,7 @@ body {
 .role-select-dropdown {
   width: 100%;
   background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text-normal);
   font-size: 12px;
   font-weight: 600;
@@ -521,80 +531,64 @@ body {
   background: #232428;
 }
 
-.role-quick-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.role-chip {
-  background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 3px 7px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.role-chip:hover {
-  background: #35373c;
+.new-game-primary-btn {
+  width: 100%;
+  background: var(--discord-blurple);
   color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
-.role-chip.good-chip.active {
-  background: rgba(35, 165, 90, 0.22);
-  border-color: rgba(74, 222, 128, 0.55);
-  color: #4ade80;
+.new-game-primary-btn:hover {
+  background: var(--discord-blurple-hover);
 }
 
-.role-chip.evil-chip.active {
-  background: rgba(218, 55, 60, 0.24);
-  border-color: rgba(248, 113, 113, 0.55);
-  color: #f87171;
+.new-game-primary-btn:active {
+  transform: translateY(1px);
 }
 
-.role-chip.active:not(.good-chip):not(.evil-chip) {
-  background: rgba(88, 101, 242, 0.25);
-  border-color: rgba(88, 101, 242, 0.65);
-  color: #c7d2fe;
+.demo-jump-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.demo-jump-btn {
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.demo-jump-btn:hover {
+  background: #35373c;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
 }
 
 .role-epistemic-note {
   font-size: 10.5px;
   line-height: 1.35;
   color: var(--text-muted);
-  margin-top: 4px;
+  margin-top: 2px;
   padding-top: 5px;
   border-top: 1px dashed rgba(255, 255, 255, 0.07);
-}
-
-/* Stage Presets */
-.preset-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.preset-item {
-  width: 100%;
-  text-align: left;
-  background: #1e1f22;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  padding: 6px 9px;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.preset-item:hover {
-  background: #35373c;
-  color: #fff;
 }
 
 /* Voice Connection & User Profile Footer */
@@ -692,16 +686,19 @@ body {
   padding: 14px 18px;
   gap: 12px;
   height: 100vh;
+  min-width: 260px;
   overflow: hidden;
   position: relative;
+  container-type: inline-size;
 }
 
 /* Top Floating Pill & Context Action Bar */
 .stage-top-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   flex-shrink: 0;
   min-height: 40px;
 }
@@ -710,13 +707,14 @@ body {
   background: #1b1c20;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
-  padding: 7px 15px;
+  padding: 7px 14px;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 13px;
   color: var(--text-normal);
-  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .meeting-info-pill.urgent {
@@ -818,8 +816,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
+  min-width: 220px;
   max-width: 720px;
 }
 
@@ -879,14 +878,66 @@ body {
   background: var(--discord-red-hover);
 }
 
+.action-cta-btn.secondary {
+  background: #2b2d31;
+  color: var(--text-normal);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.action-cta-btn.secondary:hover {
+  background: #383a40;
+  color: #fff;
+}
+
 /* 8-Tile 4x2 16:9 Video Call Grid */
 .video-grid-8 {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 12px;
   min-height: 0;
+  min-width: 0;
+}
+
+/* Compact 2x4 Grid when Video Stage is narrowed by expanding Chat Drawer */
+.video-call-stage.compact-stage {
+  padding: 10px 12px;
+  gap: 8px;
+}
+
+.video-call-stage.compact-stage .video-grid-8 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.video-call-stage.compact-stage .tile-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.video-call-stage.compact-stage .tile-bottom-pill {
+  padding: 3px 8px;
+  bottom: 6px;
+  left: 6px;
+}
+
+.video-call-stage.compact-stage .tile-participant-name {
+  font-size: 11px;
+}
+
+.video-call-stage.compact-stage .tile-live-caption {
+  font-size: 10.5px;
+  padding: 4px 7px;
+  bottom: 32px;
+  -webkit-line-clamp: 1;
+}
+
+.video-call-stage.compact-stage .call-pill-btn {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .zoom-tile {
@@ -898,6 +949,8 @@ body {
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   user-select: none;
+  min-width: 0;
+  min-height: 0;
 }
 
 .zoom-tile:hover {
@@ -1077,7 +1130,7 @@ body {
   50% { height: 12px; }
 }
 
-/* Bottom Floating Circular Call Controls Dock */
+/* Bottom Labeled Pill Call Controls Dock */
 .call-controls-dock {
   display: flex;
   align-items: center;
@@ -1088,61 +1141,98 @@ body {
 
 .call-buttons-group {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
+  gap: 8px;
   background: #1b1c20;
   border: 1px solid var(--border-subtle);
-  padding: 7px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
 }
 
-.call-circle-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
+.call-pill-btn {
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
   background: #2b2d31;
-  color: var(--text-normal);
-  border: none;
-  display: flex;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.call-circle-btn:hover {
+.call-pill-btn:hover {
   background: #383a40;
-}
-
-.call-circle-btn.active {
-  background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
-.call-circle-btn.recording {
+.call-pill-btn.active {
+  background: rgba(88, 101, 242, 0.24);
+  border-color: rgba(88, 101, 242, 0.6);
+  color: #fff;
+}
+
+.call-pill-btn.recording {
   background: var(--discord-green);
+  border-color: var(--discord-green);
   color: #fff;
-}
-
-.call-circle-btn.hangup {
-  background: var(--discord-red);
-  color: #fff;
-}
-
-.call-circle-btn.hangup:hover {
-  background: var(--discord-red-hover);
 }
 
 /* =========================================================================
-   4. RIGHT DISCORD VOICE CHAT & INSPECTOR DRAWER (324px)
+   4. RIGHT DISCORD VOICE CHAT & INSPECTOR DRAWER (Resizable)
    ========================================================================= */
 .chat-drawer {
+  position: relative;
   background: var(--bg-chat);
   border-left: 1px solid rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
   height: 100vh;
+  min-width: 280px;
   overflow: hidden;
+}
+
+/* Draggable Left-Edge Splitter for Resizing Chat vs. Video Stage */
+.chat-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.chat-resize-handle::after {
+  content: '';
+  width: 3px;
+  height: 46px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background-color 0.15s ease, height 0.15s ease;
+}
+
+.chat-resize-handle:hover,
+.chat-resize-handle.dragging {
+  background: rgba(88, 101, 242, 0.22);
+}
+
+.chat-resize-handle:hover::after,
+.chat-resize-handle.dragging::after {
+  background: var(--discord-blurple);
+  height: 76px;
 }
 
 .chat-drawer-header {
@@ -1273,41 +1363,12 @@ body {
 
 /* Bottom Discord Chat Composer */
 .discord-chat-composer {
-  padding: 8px 12px 12px 12px;
+  padding: 10px 12px 12px 12px;
   background: var(--bg-chat);
   border-top: 1px solid rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
   gap: 7px;
-}
-
-.mention-chips-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.mention-chip {
-  background: #232428;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 7px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.mention-chip:hover {
-  color: var(--text-normal);
-  background: #2b2d31;
-}
-
-.mention-chip.active {
-  background: rgba(88, 101, 242, 0.24);
-  border-color: var(--discord-blurple);
-  color: #c7d2fe;
 }
 
 .discord-input-box {

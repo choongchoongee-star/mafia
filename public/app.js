@@ -632,7 +632,6 @@ function renderZoomGrid() {
  * Handles clicking on a player's video tile:
  * - During TEAM_PROPOSAL when Human is Leader: toggles selecting that player for the Quest Team.
  * - During ASSASSIN_PHASE when Human is Assassin: shoots that player as Merlin.
- * - During DISCUSSION: selects that idol as the `@Mention` target.
  * @param {string} playerId
  */
 function handleTileClick(playerId) {
@@ -656,11 +655,6 @@ function handleTileClick(playerId) {
     playerId !== 'player_human'
   ) {
     triggerAssassination(playerId);
-    return;
-  }
-
-  if (playerId !== 'player_human') {
-    setTargetMentionChip(playerId);
   }
 }
 
@@ -828,7 +822,7 @@ async function triggerDiscussionStep(humanMessage = null) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         humanMessage,
-        targetMemberId: state.selectedTargetMemberId || null,
+        targetMemberId: null,
         elapsedRoundSec: state.discussionElapsedSec,
         skipTts: !state.audioEnabled
       })
@@ -1316,22 +1310,78 @@ function updateTimerDisplay() {
 }
 
 /**
- * Sets the active `@Idol` mention chip for targeted questioning.
- * @param {string} targetId
+ * Enables dragging the left edge (`#chatResizeHandle`) of `#rightChatDrawer`
+ * to expand the chat drawer and shrink the center video stage (`#zoomGridContainer`)
+ * while strictly preserving the left settings/channel sidebar (`64px + 244px = 308px`).
  */
-function setTargetMentionChip(targetId) {
-  state.selectedTargetMemberId = targetId;
-  document.querySelectorAll('.mention-chip').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.target === targetId);
-  });
-  const input = document.getElementById('humanChatInput');
-  if (input && targetId) {
-    const idol = state.players.find((p) => p.id === targetId);
-    if (idol && !input.value.includes(`@${idol.name}`)) {
-      input.value = `@${idol.name} ${input.value}`.trim() + ' ';
-      input.focus();
+function setupChatDrawerResizer() {
+  const handle = document.getElementById('chatResizeHandle');
+  const appEl = document.getElementById('discordApp');
+  const stageEl = document.querySelector('.video-call-stage');
+  if (!handle || !appEl) return;
+
+  const LEFT_FIXED_SIDEBAR_PX = 64 + 244; // 308px (server rail + channel/settings sidebar)
+  const MIN_VIDEO_STAGE_PX = 280;
+  const MIN_CHAT_DRAWER_PX = 280;
+
+  let currentChatWidth = 360;
+  let isDragging = false;
+
+  const applyChatDrawerWidth = (requestedWidth) => {
+    const maxChatWidth = Math.max(
+      MIN_CHAT_DRAWER_PX,
+      window.innerWidth - LEFT_FIXED_SIDEBAR_PX - MIN_VIDEO_STAGE_PX
+    );
+    currentChatWidth = Math.min(maxChatWidth, Math.max(MIN_CHAT_DRAWER_PX, requestedWidth));
+    appEl.style.setProperty('--chat-drawer-width', `${Math.round(currentChatWidth)}px`);
+
+    const remainingStageWidth = window.innerWidth - LEFT_FIXED_SIDEBAR_PX - currentChatWidth;
+    if (stageEl) {
+      stageEl.classList.toggle('compact-stage', remainingStageWidth <= 720);
     }
-  }
+  };
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    isDragging = true;
+    handle.classList.add('dragging');
+    appEl.classList.add('resizing-chat');
+    if (handle.setPointerCapture) {
+      try {
+        handle.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore pointer capture errors
+      }
+    }
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const desiredWidth = window.innerWidth - e.clientX;
+    applyChatDrawerWidth(desiredWidth);
+  });
+
+  const stopDragging = () => {
+    if (!isDragging) return;
+    isDragging = false;
+    handle.classList.remove('dragging');
+    appEl.classList.remove('resizing-chat');
+  };
+
+  window.addEventListener('pointerup', stopDragging);
+  window.addEventListener('pointercancel', stopDragging);
+
+  // Double-click the splitter to quickly toggle between standard (360px) and wide chat (640px)
+  handle.addEventListener('dblclick', () => {
+    const targetWidth = currentChatWidth < 500 ? 640 : 360;
+    applyChatDrawerWidth(targetWidth);
+  });
+
+  window.addEventListener('resize', () => {
+    applyChatDrawerWidth(currentChatWidth);
+  });
+
+  applyChatDrawerWidth(currentChatWidth);
 }
 
 /**
@@ -1484,6 +1534,7 @@ function initApp() {
   startWebcamAnimationLoop();
   startAutonomousPhaseTimer();
   setupMicrophoneInput();
+  setupChatDrawerResizer();
 
   // Live Chat Form Submit
   const chatForm = document.getElementById('liveChatForm');
@@ -1529,13 +1580,6 @@ function initApp() {
     if (!appEl) return;
     const isCollapsed = appEl.classList.toggle('chat-collapsed');
     e.currentTarget.classList.toggle('active', !isCollapsed);
-  });
-
-  // Mention Chips
-  document.querySelectorAll('.mention-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      setTargetMentionChip(chip.dataset.target || '');
-    });
   });
 
   // Scenario Preset Buttons (both in left rail and sidebar)

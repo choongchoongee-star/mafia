@@ -34,6 +34,12 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:34 KST] Task 14: Resizable Chat Drawer vs. Video Stage (`#chatResizeHandle`), Open Table-Talk Rule (Removed `@Idol` Calling), & Fast Text-Only Mode (`skipTts`)**
+  - **Action**:
+    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the draggable `#chatResizeHandle` splitter, fixed-width left sidebar (`64px + 244px`), open table-talk rule (no `@Idol` targeted calling), and `💬 Text-Only Mode` (`skipTts`).
+    2. Added `#chatResizeHandle` to `#rightChatDrawer` in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), styled `.chat-resize-handle` and `.video-call-stage.compact-stage` (`2×4` responsive video grid when narrowed) in [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and implemented `setupChatDrawerResizer()` in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so dragging the left edge of the chat window expands the chat and shrinks the video profile area without ever encroaching on the left settings sidebar.
+    3. Removed `#mentionChipsRow` and `@Idol` calling logic across [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) so all chat messages are broadcast openly to everyone in `#avalon-stage-7p`.
+  - **Result**: Verified syntax (`node --check`) across all frontend/backend files, verified live on `http://localhost:8080`, and pushed to GitHub.
 - **[2026-10-16 13:21 KST] Task 13: Interactive Player Role Selection & Strict Epistemic Isolation**
   - **Action**:
     1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) and [README.md](file:///c:/Users/Charlie/Business/Projects/mafia/README.md) to document that the Human Player can freely select their Avalon role (`RANDOM`, `MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`) while the remaining 6 roles from the official 7-player deck are cryptographically shuffled across the 6 AI Idols under strict Epistemic Isolation (`buildPrivatePlayerView`).
@@ -55,7 +61,3 @@
 - **[2026-10-16 13:04 KST] Task 10: Core Purpose, Engineering Retrospective & Future Roadmap Documentation**
   - **Action**: Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) and [README.md](file:///c:/Users/Charlie/Business/Projects/mafia/README.md) with the Core Problem Statement (solving the 7–10 player headcount barrier of Mafia/Avalon), the Real-Time Video Generation Latency vs. Debate Pacing Retrospective, and the 3-pillar Future Product Roadmap.
   - **Result**: Ready for direct copy-paste into the Hackathon Submission Form and pushed to GitHub.
-- **[2026-10-16 13:03 KST] Task 9: Live `.env` Verification, Lyria 3.5 Adaptive BGM API & Microphone Voice Input (`gemini-3.5-transcribe`)**
-  - **Action**: Verified live `GEMINI_API_KEY` in [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env), implemented [`generateAdaptiveBgmLoop`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) (`lyria-3-clip-preview`), and upgraded [`transcribePlayerAudio`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) (`gemini-3.5-transcribe`).
-  - **Result**: All companion model endpoints verified live on `http://localhost:8080`.
-
