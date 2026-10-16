@@ -119,13 +119,15 @@ app.post('/api/game/new', async (req, res) => {
       playerName = 'Guest',
       demoPreset = 'STANDARD',
       preferredRole = 'RANDOM',
-      apiKey
+      apiKey,
+      skipTts = false
     } = req.body || {};
     if (apiKey) {
       setRuntimeGeminiApiKey(apiKey);
     }
 
     const game = createAvalonGame({ playerName, demoPreset, preferredRole });
+    game.skipTts = Boolean(skipTts);
     activeGames.set(game.gameId, game);
 
     const mcOpeningTurn = await generateMcJaesukCommentary(game, 'GAME_START', {
@@ -164,7 +166,8 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { proposedTeamIds } = req.body || {};
+    const { proposedTeamIds, skipTts } = req.body || {};
+    if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let latestTurn = null;
 
     if (game.leaderId === 'player_human') {
@@ -229,7 +232,13 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { humanMessage = null, targetMemberId = null, elapsedRoundSec = 0 } = req.body || {};
+    const {
+      humanMessage = null,
+      targetMemberId = null,
+      elapsedRoundSec = 0,
+      skipTts
+    } = req.body || {};
+    if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let humanStoredTurn = null;
 
     if (humanMessage && String(humanMessage).trim().length > 0) {
@@ -300,7 +309,8 @@ app.post('/api/game/:gameId/vote', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { humanVote = null } = req.body || {};
+    const { humanVote = null, skipTts } = req.body || {};
+    if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     const allVotes = await generateParallelTeamVotes(game, humanVote);
     const voteResolution = resolveTeamVotes(game, allVotes);
 
@@ -328,7 +338,8 @@ app.post('/api/game/:gameId/quest', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { humanQuestCard = null } = req.body || {};
+    const { humanQuestCard = null, skipTts } = req.body || {};
+    if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     const submittedCards = await generateQuestCards(game, humanQuestCard);
     const questOutcome = resolveQuestExecution(game, submittedCards);
 
@@ -356,7 +367,8 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { targetPlayerId = null } = req.body || {};
+    const { targetPlayerId = null, skipTts } = req.body || {};
+    if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     const decision = await generateAssassinDecision(game, targetPlayerId);
     const assassinTurn = appendTranscriptItem(game, decision.assassinSpeechTurn);
     const assassinationOutcome = resolveAssassination(

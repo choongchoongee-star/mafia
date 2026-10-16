@@ -86,12 +86,35 @@
           <div id="rejectTrackContainer" class="reject-track-row"></div>
         </div>
 
-        <!-- Secret Role Card -->
+        <!-- Secret Role Card & Player Role Selector -->
         <div class="sidebar-section role-widget" id="secretRoleCard">
           <div class="sidebar-section-header">
             <span>YOUR SECRET ROLE</span>
             <button id="toggleRoleMaskBtn" class="text-link-btn" type="button">Hide</button>
           </div>
+
+          <div class="role-picker-box">
+            <label for="preferredRoleSelect" class="role-picker-label">CHOOSE YOUR ROLE (NEW GAME)</label>
+            <select id="preferredRoleSelect" class="role-select-dropdown" title="Choose which role you want to play (remaining 6 roles are secretly shuffled among the 6 AI Idols)">
+              <option value="RANDOM">🎲 Random Role (Surprise)</option>
+              <option value="MERLIN">🧙‍♂️ Merlin (Good • Sees 3 Evil)</option>
+              <option value="PERCIVAL">🛡️ Percival (Good • Sees Merlin/Morgana)</option>
+              <option value="LOYAL_SERVANT">⚔️ Loyal Servant (Good • Citizen)</option>
+              <option value="ASSASSIN">🗡️ Assassin (Evil • Final Merlin Shot)</option>
+              <option value="MORGANA">🔮 Morgana (Evil • Disguised as Merlin)</option>
+              <option value="OBERON">👁️ Oberon (Evil • Blind Wildcard)</option>
+            </select>
+            <div class="role-quick-chips" id="roleQuickChips">
+              <button type="button" class="role-chip active" data-role="RANDOM" title="Randomly assign all 7 roles">Random</button>
+              <button type="button" class="role-chip good-chip" data-role="MERLIN" title="Play as Merlin (Good)">Merlin</button>
+              <button type="button" class="role-chip good-chip" data-role="PERCIVAL" title="Play as Percival (Good)">Percival</button>
+              <button type="button" class="role-chip good-chip" data-role="LOYAL_SERVANT" title="Play as Loyal Servant (Good)">Servant</button>
+              <button type="button" class="role-chip evil-chip" data-role="ASSASSIN" title="Play as Assassin (Evil)">Assassin</button>
+              <button type="button" class="role-chip evil-chip" data-role="MORGANA" title="Play as Morgana (Evil)">Morgana</button>
+              <button type="button" class="role-chip evil-chip" data-role="OBERON" title="Play as Oberon (Evil)">Oberon</button>
+            </div>
+          </div>
+
           <div id="roleCardBody" class="role-widget-body">
             <div class="role-top-line">
               <span id="humanRoleTitle" class="role-name-text">Loading...</span>
@@ -99,6 +122,9 @@
             </div>
             <p id="humanNightVisionText" class="role-vision-text">
               Waiting for night phase vision...
+            </p>
+            <p class="role-epistemic-note">
+              🔒 Remaining 6 roles are secretly shuffled among the 6 AI Idols. Nobody knows your role (or anyone else's) except via official Avalon Night Rules.
             </p>
           </div>
         </div>
@@ -167,15 +193,18 @@
           <span class="pill-divider"></span>
           <span id="phaseTimerValue" class="meeting-timer">00:20</span>
           <span class="pill-divider"></span>
-          <span class="meeting-participants" title="8 Participants (MC Jae-suk + 6 Idols + You)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            <span>8</span>
-          </span>
+          <label class="stage-role-pill" title="Choose your Avalon role (remaining 6 roles are secretly shuffled across the 6 AI Idols)">
+            <span class="stage-role-label">My Role:</span>
+            <select id="stageRoleSelect" class="stage-role-select">
+              <option value="RANDOM">🎲 Random</option>
+              <option value="MERLIN">🧙‍♂️ Merlin (Good)</option>
+              <option value="PERCIVAL">🛡️ Percival (Good)</option>
+              <option value="LOYAL_SERVANT">⚔️ Servant (Good)</option>
+              <option value="ASSASSIN">🗡️ Assassin (Evil)</option>
+              <option value="MORGANA">🔮 Morgana (Evil)</option>
+              <option value="OBERON">👁️ Oberon (Evil)</option>
+            </select>
+          </label>
           <span id="bystanderStatusBadge" class="bystander-chip hidden">Bystander Mode</span>
         </div>
 

@@ -37,6 +37,8 @@ const state = {
   discussionElapsedSec: 0,
   lastAutoBeatSec: 0,
   isBusyRequest: false,
+  preferredRole: 'RANDOM',
+  gameStartSeq: 0,
   portraitImages: new Map(),
   avatarAnimStates: new Map(),
   activeVideoStreams: new Map(),
@@ -61,24 +63,37 @@ function preloadPortraitImages() {
 /**
  * Starts a new 7-player Avalon game session on the server.
  * @param {'STANDARD'|'QUEST_4_CRITICAL'|'ASSASSIN_CLIMAX'} [demoPreset='STANDARD']
+ * @param {string|null} [preferredRoleOverride=null]
  */
-async function startNewGame(demoPreset = 'STANDARD') {
-  if (state.isBusyRequest) return;
+async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = null) {
+  const mySeq = (state.gameStartSeq || 0) + 1;
+  state.gameStartSeq = mySeq;
   state.isBusyRequest = true;
   state.selectedProposalIds.clear();
   stopActiveSpeech();
 
   try {
+    const preferredRole =
+      preferredRoleOverride ||
+      state.preferredRole ||
+      document.getElementById('preferredRoleSelect')?.value ||
+      document.getElementById('stageRoleSelect')?.value ||
+      'RANDOM';
+    state.preferredRole = preferredRole;
+
     const response = await fetch('/api/game/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playerName: 'Guest',
-        demoPreset
+        demoPreset,
+        preferredRole,
+        skipTts: !state.audioEnabled
       })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to start game');
+    if (mySeq !== state.gameStartSeq) return;
 
     applyServerGameState(data);
     resetPhaseClock(data.board.phaseTimerSec);
@@ -88,8 +103,13 @@ async function startNewGame(demoPreset = 'STANDARD') {
     }
 
     if (state.board.phase === 'TEAM_PROPOSAL' && state.board.leaderId !== 'player_human') {
+      const targetGameId = state.gameId;
       setTimeout(() => {
-        if (state.board?.phase === 'TEAM_PROPOSAL' && state.board.leaderId !== 'player_human') {
+        if (
+          state.gameId === targetGameId &&
+          state.board?.phase === 'TEAM_PROPOSAL' &&
+          state.board.leaderId !== 'player_human'
+        ) {
           triggerTeamProposal([]);
         }
       }, 2400);
@@ -97,7 +117,9 @@ async function startNewGame(demoPreset = 'STANDARD') {
   } catch (err) {
     console.error('Error starting new game:', err);
   } finally {
-    state.isBusyRequest = false;
+    if (mySeq === state.gameStartSeq) {
+      state.isBusyRequest = false;
+    }
   }
 }
 
@@ -291,11 +313,24 @@ function renderSidebarVoiceMembers() {
 }
 
 /**
- * Renders the Human Player's randomly assigned secret Avalon Role & Night Vision card.
+ * Renders the Human Player's assigned secret Avalon Role & Night Vision card.
  */
 function renderSecretRoleCard() {
   const view = state.humanPrivateView;
   if (!view) return;
+
+  const activePref = state.board?.preferredRole || state.preferredRole || 'RANDOM';
+  const sidebarSelect = document.getElementById('preferredRoleSelect');
+  const stageSelect = document.getElementById('stageRoleSelect');
+  if (sidebarSelect && sidebarSelect.value !== activePref) {
+    sidebarSelect.value = activePref;
+  }
+  if (stageSelect && stageSelect.value !== activePref) {
+    stageSelect.value = activePref;
+  }
+  document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
+    chip.classList.toggle('active', chip.dataset.role === activePref);
+  });
 
   const roleTitle = document.getElementById('humanRoleTitle');
   const alignBadge = document.getElementById('humanAlignmentBadge');
@@ -494,8 +529,14 @@ function renderZoomGrid() {
 
   // Latest spoken turn per participant
   const latestSpokenByPlayer = {};
-  state.transcript.slice(-8).forEach((t) => {
+  state.transcript.slice(-10).forEach((t) => {
     latestSpokenByPlayer[t.speakerId] = t;
+  });
+
+  // Map latest 6-agent parallel floor bids by speakerId
+  const latestBidsByPlayer = {};
+  (board.lastAgentBids || []).forEach((b) => {
+    latestBidsByPlayer[b.speakerId] = b;
   });
 
   allTiles.forEach((participant) => {
@@ -519,15 +560,18 @@ function renderZoomGrid() {
 
     const leftHtml = [];
     if (participant.isMc) {
-      leftHtml.push('<span class="tile-badge">Host</span>');
+      leftHtml.push('<span class="tile-badge">🎙️ Variety Host</span>');
     } else {
       if (board.leaderId === participant.id) {
-        leftHtml.push('<span class="tile-badge leader-crown">Leader</span>');
+        leftHtml.push('<span class="tile-badge leader-crown">👑 Leader</span>');
       }
       if (isProposed) {
-        leftHtml.push('<span class="tile-badge team-shield">On Quest</span>');
+        leftHtml.push('<span class="tile-badge team-shield">🛡️ On Quest</span>');
       } else if (isSelectedForProposal) {
-        leftHtml.push('<span class="tile-badge leader-crown">Selected</span>');
+        leftHtml.push('<span class="tile-badge leader-crown">✓ Selected</span>');
+      }
+      if (participant.dialectTag) {
+        leftHtml.push(`<span class="tile-badge">${participant.dialectTag}</span>`);
       }
     }
     leftBadges.innerHTML = leftHtml.join('');
@@ -555,13 +599,27 @@ function renderZoomGrid() {
         const v = state.currentVotes[participant.id].vote;
         const cls = v === 'APPROVE' ? 'vote-approve' : 'vote-reject';
         rightHtml.push(`<span class="tile-badge ${cls}">${v === 'APPROVE' ? 'Approved' : 'Rejected'}</span>`);
+      } else if (board.phase === 'DISCUSSION' && !participant.isHuman) {
+        const bid = latestBidsByPlayer[participant.id];
+        if (
+          state.activeClashYielderId === participant.id ||
+          board.lastFloorEvent?.yielderId === participant.id
+        ) {
+          rightHtml.push('<span class="tile-badge epistemic-merlin-cand">🤝 Yielded Mic</span>');
+        } else if (bid && !isSpeaking) {
+          if (bid.intent === 'INTERRUPT' && bid.urgency >= 70) {
+            rightHtml.push('<span class="tile-badge vote-reject">✋ Wants Mic</span>');
+          } else if (bid.intent === 'HOLD_SILENT') {
+            rightHtml.push('<span class="tile-badge">🤫 Strategic Silence</span>');
+          }
+        }
       }
     }
     rightBadges.innerHTML = rightHtml.join('');
 
-    // Show clean closed-caption overlay for active speaker (or MC host cue)
+    // Show clean closed-caption overlay for active speaker or latest dialect turn during DISCUSSION
     const lastTurn = latestSpokenByPlayer[participant.id];
-    if (lastTurn && isSpeaking) {
+    if (lastTurn && (isSpeaking || (board.phase === 'DISCUSSION' && state.transcript.slice(-2).some((t) => t.id === lastTurn.id)))) {
       captionEl.textContent = lastTurn.text;
       captionEl.classList.remove('hidden');
     } else {
@@ -625,6 +683,15 @@ function renderTranscriptAndXray() {
         const avatarEl = avatarUrl
           ? `<img class="msg-avatar" src="${avatarUrl}" alt="${item.speakerName}" />`
           : `<div class="msg-avatar-fallback">G</div>`;
+        const dialectHtml = item.dialectTag
+          ? `<span class="msg-meta">${item.dialectTag}</span>`
+          : '';
+        const floorBadgeHtml =
+          item.floorEventType === 'COLLISION_YIELD'
+            ? '<span class="msg-meta" style="color:#f59e0b">⚡ Mic Clash → Yielded</span>'
+            : item.floorEventType === 'COLLISION_WINNER'
+              ? '<span class="msg-meta" style="color:#4ade80">🎙️ Took Floor After Yield</span>'
+              : '';
 
         return `
           <div class="discord-msg">
@@ -633,6 +700,8 @@ function renderTranscriptAndXray() {
               <div class="msg-header">
                 <span class="msg-author ${authorClass}">${item.speakerName}</span>
                 <span class="msg-meta">Q${item.questNumber}</span>
+                ${dialectHtml}
+                ${floorBadgeHtml}
               </div>
               <div class="msg-text">${item.text}</div>
             </div>
@@ -664,7 +733,24 @@ function renderTranscriptAndXray() {
 
   const monologueList = document.getElementById('innerMonologueList');
   if (monologueList) {
-    monologueList.innerHTML = (xray.recentInnerMonologues || [])
+    const bidsHtml =
+      xray.lastAgentBids && xray.lastAgentBids.length > 0
+        ? `
+        <div class="xray-card" style="border-left: 3px solid #5865f2;">
+          <div><strong>6-Agent Parallel Floor Bids (Promise.all)</strong></div>
+          ${xray.lastAgentBids
+            .map(
+              (b) => `
+            <div class="xray-thought" style="margin-top:3px;">
+              <strong>${b.speakerName}</strong> [${b.intent} • Urgency ${b.urgency}]: "${b.innerThought}"
+            </div>`
+            )
+            .join('')}
+        </div>
+      `
+        : '';
+
+    const monologuesHtml = (xray.recentInnerMonologues || [])
       .slice()
       .reverse()
       .map(
@@ -677,6 +763,8 @@ function renderTranscriptAndXray() {
       `
       )
       .join('');
+
+    monologueList.innerHTML = bidsHtml + monologuesHtml;
   }
 
   const trueRolesContainer = document.getElementById('trueRolesContainer');
@@ -705,7 +793,10 @@ async function triggerTeamProposal(proposedTeamIds = []) {
     const res = await fetch(`/api/game/${state.gameId}/propose`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proposedTeamIds })
+      body: JSON.stringify({
+        proposedTeamIds,
+        skipTts: !state.audioEnabled
+      })
     });
     const data = await res.json();
     if (res.ok) {
@@ -722,7 +813,8 @@ async function triggerTeamProposal(proposedTeamIds = []) {
 }
 
 /**
- * Advances one live debate turn during the 75s DISCUSSION phase.
+ * Advances one live 6-Agent Multi-Agent Debate step during the DISCUSSION phase.
+ * Supports simultaneous Mic Clash & Polite Yield (`data.yieldTurn` -> `data.latestTurn`).
  * @param {string|null} [humanMessage=null]
  */
 async function triggerDiscussionStep(humanMessage = null) {
@@ -737,14 +829,20 @@ async function triggerDiscussionStep(humanMessage = null) {
       body: JSON.stringify({
         humanMessage,
         targetMemberId: state.selectedTargetMemberId || null,
-        elapsedRoundSec: state.discussionElapsedSec
+        elapsedRoundSec: state.discussionElapsedSec,
+        skipTts: !state.audioEnabled
       })
     });
     const data = await res.json();
     if (res.ok) {
       applyServerGameState(data);
+      if (data.yieldTurn) {
+        state.activeClashYielderId = data.yieldTurn.speakerId;
+        await playTurnVoiceAndHighlight(data.yieldTurn);
+        state.activeClashYielderId = null;
+      }
       if (data.latestTurn) {
-        playTurnVoiceAndHighlight(data.latestTurn);
+        await playTurnVoiceAndHighlight(data.latestTurn);
       }
     }
   } catch (err) {
@@ -787,7 +885,10 @@ async function triggerSubmitVote(humanVote = null) {
     const res = await fetch(`/api/game/${state.gameId}/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ humanVote })
+      body: JSON.stringify({
+        humanVote,
+        skipTts: !state.audioEnabled
+      })
     });
     const data = await res.json();
     if (res.ok) {
@@ -834,7 +935,10 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
     const res = await fetch(`/api/game/${state.gameId}/quest`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ humanQuestCard })
+      body: JSON.stringify({
+        humanQuestCard,
+        skipTts: !state.audioEnabled
+      })
     });
     const data = await res.json();
     if (res.ok) {
@@ -881,7 +985,10 @@ async function triggerAssassination(targetPlayerId = null) {
     const res = await fetch(`/api/game/${state.gameId}/assassinate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetPlayerId })
+      body: JSON.stringify({
+        targetPlayerId,
+        skipTts: !state.audioEnabled
+      })
     });
     const data = await res.json();
     if (res.ok) {
@@ -899,11 +1006,12 @@ async function triggerAssassination(targetPlayerId = null) {
 
 /**
  * Plays the character's spoken audio (`gemini-3.8-flash-tts` or browser neural TTS),
- * attaches any `gemini-omni-1.1-flash` video stream, and highlights their Discord tile.
+ * highlights their Discord tile, and returns a Promise that resolves when speech finishes.
  * @param {object} turn
+ * @returns {Promise<void>}
  */
 function playTurnVoiceAndHighlight(turn) {
-  if (!turn) return;
+  if (!turn) return Promise.resolve();
   const text = String(turn.text || '');
   state.activeSpeakerId = turn.speakerId;
   state.activeSpeechText = text;
@@ -911,29 +1019,45 @@ function playTurnVoiceAndHighlight(turn) {
   state.activeSpeechCharIndex = 0;
   state.activeTargetPlayerId = turn.targetPlayerId || null;
 
+  const isYieldTurn = turn.floorEventType === 'COLLISION_YIELD';
   const wordCount = text.split(/\s+/).filter(Boolean).length;
-  const estimatedDurationMs = Math.max(3000, Math.min(9500, wordCount * 320));
+  const estimatedDurationMs = isYieldTurn
+    ? Math.max(1400, Math.min(2800, wordCount * 280))
+    : Math.max(2600, Math.min(8500, wordCount * 310));
   state.activeSpeechEndTime = Date.now() + estimatedDurationMs;
-
-  if (turn.videoUrl || turn.videoTaskId) {
-    attachOrPollTurnVideoStream(turn);
-  }
 
   renderZoomGrid();
   renderSidebarVoiceMembers();
 
-  if (!state.audioEnabled) return;
-
-  if (turn.audioBase64) {
-    try {
-      const audio = new Audio(`data:${turn.audioMimeType || 'audio/wav'};base64,${turn.audioBase64}`);
-      audio.onended = () => {
+  if (!state.audioEnabled) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
         if (state.activeSpeakerId === turn.speakerId) {
           clearActiveSpeakerState();
         }
-      };
-      audio.play().catch(() => {});
-      return;
+        resolve();
+      }, Math.min(estimatedDurationMs, isYieldTurn ? 1500 : 2800));
+    });
+  }
+
+  if (turn.audioBase64) {
+    try {
+      return new Promise((resolve) => {
+        const audio = new Audio(`data:${turn.audioMimeType || 'audio/wav'};base64,${turn.audioBase64}`);
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          if (state.activeSpeakerId === turn.speakerId) {
+            clearActiveSpeakerState();
+          }
+          resolve();
+        };
+        audio.onended = finish;
+        audio.onerror = finish;
+        setTimeout(finish, estimatedDurationMs + 1200);
+        audio.play().catch(finish);
+      });
     } catch {
       // Fall through to browser neural TTS
     }
@@ -941,48 +1065,60 @@ function playTurnVoiceAndHighlight(turn) {
 
   if ('speechSynthesis' in window) {
     try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
+      return new Promise((resolve) => {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
 
-      const voices = window.speechSynthesis.getVoices();
-      const playerObj = state.players.find((p) => p.id === turn.speakerId);
+        const voices = window.speechSynthesis.getVoices();
+        const playerObj = state.players.find((p) => p.id === turn.speakerId);
 
-      if (turn.speakerId === 'mc_jaesuk') {
-        const maleVoice = voices.find(
-          (v) => /en/i.test(v.lang) && /(male|david|guy|daniel|mark|google us english)/i.test(v.name)
-        );
-        if (maleVoice) utterance.voice = maleVoice;
-        utterance.pitch = 1.05;
-        utterance.rate = 1.08;
-      } else {
-        const femaleVoices = voices.filter(
-          (v) => /en/i.test(v.lang) && /(female|zira|samantha|aria|jenny|victoria|google)/i.test(v.name)
-        );
-        const seatIdx = playerObj?.seatIndex || 0;
-        if (femaleVoices.length > 0) {
-          utterance.voice = femaleVoices[seatIdx % femaleVoices.length];
+        if (turn.speakerId === 'mc_jaesuk') {
+          const maleVoice = voices.find(
+            (v) => /en/i.test(v.lang) && /(male|david|guy|daniel|mark|google us english)/i.test(v.name)
+          );
+          if (maleVoice) utterance.voice = maleVoice;
+          utterance.pitch = 1.05;
+          utterance.rate = 1.08;
+        } else {
+          const femaleVoices = voices.filter(
+            (v) => /en/i.test(v.lang) && /(female|zira|samantha|aria|jenny|victoria|google)/i.test(v.name)
+          );
+          const seatIdx = playerObj?.seatIndex || 0;
+          if (femaleVoices.length > 0) {
+            utterance.voice = femaleVoices[seatIdx % femaleVoices.length];
+          }
+          utterance.pitch = playerObj?.pitchOffset || 1.08;
+          utterance.rate = playerObj?.rateOffset || 1.04;
         }
-        utterance.pitch = playerObj?.pitchOffset || 1.08;
-        utterance.rate = playerObj?.rateOffset || 1.04;
-      }
 
-      utterance.onboundary = (event) => {
-        if (typeof event.charIndex === 'number') {
-          state.activeSpeechCharIndex = event.charIndex;
-        }
-      };
+        utterance.onboundary = (event) => {
+          if (typeof event.charIndex === 'number') {
+            state.activeSpeechCharIndex = event.charIndex;
+          }
+        };
 
-      utterance.onend = () => {
-        if (state.activeSpeakerId === turn.speakerId) {
-          clearActiveSpeakerState();
-        }
-      };
-      window.speechSynthesis.speak(utterance);
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          if (state.activeSpeakerId === turn.speakerId) {
+            clearActiveSpeakerState();
+          }
+          resolve();
+        };
+
+        utterance.onend = finish;
+        utterance.onerror = finish;
+        setTimeout(finish, estimatedDurationMs + 800);
+        window.speechSynthesis.speak(utterance);
+      });
     } catch {
       // Ignore speech synthesis errors
     }
   }
+
+  return Promise.resolve();
 }
 
 function clearActiveSpeakerState() {
@@ -1000,59 +1136,9 @@ function stopActiveSpeech() {
   }
 }
 
-/**
- * Attaches or polls `/api/media/video/:taskId` for a `gemini-omni-1.1-flash` video stream.
- * @param {object} turn
- */
-function attachOrPollTurnVideoStream(turn) {
-  const speakerId = turn.speakerId;
-  if (turn.videoUrl) {
-    mountSpeakerVideoUrl(speakerId, turn.videoUrl);
-    return;
-  }
-  if (!turn.videoTaskId) return;
-
-  let attempts = 0;
-  const pollTimer = setInterval(async () => {
-    attempts += 1;
-    if (attempts > 8) {
-      clearInterval(pollTimer);
-      return;
-    }
-    try {
-      const res = await fetch(`/api/media/video/${turn.videoTaskId}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.videoUrl) {
-        clearInterval(pollTimer);
-        mountSpeakerVideoUrl(speakerId, data.videoUrl);
-      } else if (data.status === 'live_canvas_synced') {
-        clearInterval(pollTimer);
-      }
-    } catch {
-      clearInterval(pollTimer);
-    }
-  }, 1800);
-}
-
-function mountSpeakerVideoUrl(speakerId, videoUrl) {
-  const videoEl = document.getElementById(`video_${speakerId}`);
-  if (!videoEl || !videoUrl) return;
-  if (videoEl.src !== videoUrl) {
-    videoEl.crossOrigin = 'anonymous';
-    videoEl.src = videoUrl;
-    videoEl.play().catch(() => {});
-    state.activeVideoStreams.set(speakerId, videoEl);
-  }
-}
-
 function getOrInitAvatarAnimState(id) {
   if (!state.avatarAnimStates.has(id)) {
     state.avatarAnimStates.set(id, {
-      SmoothPanX: 0,
-      SmoothPanY: 0,
-      SmoothScale: 1.03,
-      SmoothTilt: 0,
       SmoothSpeakEnergy: 0
     });
   }
@@ -1060,7 +1146,7 @@ function getOrInitAvatarAnimState(id) {
 }
 
 /**
- * 60FPS Webcam Frame Loop for all 8 tiles (`mc_jaesuk` + 6 Idols + `player_human`).
+ * 60FPS Frame Loop for all 8 tiles (`mc_jaesuk` + 6 Idols + `player_human`).
  */
 function startWebcamAnimationLoop() {
   const renderFrame = (timestamp) => {
@@ -1089,9 +1175,9 @@ function startWebcamAnimationLoop() {
 }
 
 /**
- * Renders a clean, artifact-free 16:9 HD webcam frame onto `canvas`:
- * - Uses the real Korean K-Pop idol & MC Jae-suk portraits (`/generated/portrait_<id>.png`) or active `<video>`.
- * - Applies smooth, natural breathing & conversational camera presence without drawing artificial dots or oval seams on faces.
+ * Renders a crisp, steady 16:9 high-resolution static studio portrait onto `canvas`:
+ * - Uses the 7 photorealistic Korean K-Pop idol & MC Jae-suk portraits (`/generated/portrait_<id>.png`).
+ * - Applies a clean 1.15x center crop (`fixedScale = 1.15`) with high-DPI smoothing and zero artificial warping or camera wobble.
  * - For `player_human` (when webcam is off), renders an authentic Discord voice-call avatar tile.
  */
 function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec }) {
@@ -1102,37 +1188,23 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec
 
   ctx.clearRect(0, 0, w, h);
 
-  // Target camera/posture motion
   const targetEnergy = isSpeaking
     ? 0.5 + 0.5 * Math.sin(timeSec * 18) * Math.cos(timeSec * 11)
     : 0;
-  const targetScale = isSpeaking ? 1.055 + targetEnergy * 0.012 : 1.03 + Math.sin(timeSec * 1.8) * 0.006;
-  const targetPanX = isSpeaking
-    ? Math.sin(timeSec * 2.8) * 4.5
-    : Math.sin(timeSec * 1.1) * 2.2;
-  const targetPanY = isSpeaking
-    ? Math.abs(Math.sin(timeSec * 7.5)) * 3.2
-    : Math.cos(timeSec * 1.9) * 1.8;
-  const targetTilt = isSpeaking
-    ? Math.sin(timeSec * 2.4) * 0.008
-    : Math.sin(timeSec * 0.9) * 0.003;
-
   anim.SmoothSpeakEnergy += (targetEnergy - anim.SmoothSpeakEnergy) * 0.28;
-  anim.SmoothScale += (targetScale - anim.SmoothScale) * 0.14;
-  anim.SmoothPanX += (targetPanX - anim.SmoothPanX) * 0.16;
-  anim.SmoothPanY += (targetPanY - anim.SmoothPanY) * 0.18;
-  anim.SmoothTilt += (targetTilt - anim.SmoothTilt) * 0.14;
 
-  const activeVideoEl = state.activeVideoStreams.get(id);
-  const hasLiveVideoStream =
-    activeVideoEl && activeVideoEl.readyState >= 2 && !activeVideoEl.paused;
+  // Live webcam video stream only for the human player if they enabled their camera
+  if (isHuman) {
+    const activeVideoEl = state.activeVideoStreams.get(id);
+    const hasLiveVideoStream =
+      activeVideoEl && activeVideoEl.readyState >= 2 && !activeVideoEl.paused;
+    if (hasLiveVideoStream) {
+      ctx.drawImage(activeVideoEl, 0, 0, w, h);
+      return;
+    }
+  }
 
   const img = state.portraitImages.get(id);
-
-  if (hasLiveVideoStream) {
-    ctx.drawImage(activeVideoEl, 0, 0, w, h);
-    return;
-  }
 
   if (img && img.complete && img.naturalWidth > 0) {
     const imgRatio = img.naturalWidth / img.naturalHeight;
@@ -1147,19 +1219,22 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec
       drawH = w / imgRatio;
     }
 
-    const scaledW = drawW * anim.SmoothScale;
-    const scaledH = drawH * anim.SmoothScale;
+    // Steady 1.15x center crop to trim any edge watermarks and keep the portrait crystal clear
+    const fixedScale = 1.15;
+    const scaledW = drawW * fixedScale;
+    const scaledH = drawH * fixedScale;
 
     ctx.save();
-    ctx.translate(w / 2 + anim.SmoothPanX, h / 2 + anim.SmoothPanY);
-    ctx.rotate(anim.SmoothTilt);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.translate(w / 2, h / 2);
     ctx.drawImage(img, -scaledW / 2, -scaledH / 2, scaledW, scaledH);
     ctx.restore();
 
-    // Subtle bottom gradient so the participant pill is always crisp
+    // Subtle bottom gradient so the participant pill and closed captions are always crisp
     const bottomGrad = ctx.createLinearGradient(0, h * 0.72, 0, h);
     bottomGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    bottomGrad.addColorStop(1, 'rgba(0, 0, 0, 0.42)');
+    bottomGrad.addColorStop(1, 'rgba(0, 0, 0, 0.45)');
     ctx.fillStyle = bottomGrad;
     ctx.fillRect(0, h * 0.72, w, h * 0.28);
   } else {
@@ -1478,6 +1553,31 @@ function initApp() {
   document.querySelectorAll('[data-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
       startNewGame(btn.dataset.preset);
+    });
+  });
+
+  // Role Selector Dropdowns & Quick Chips
+  const syncRoleChoiceAndRestart = (selectedRole) => {
+    state.preferredRole = selectedRole;
+    const sidebarSelect = document.getElementById('preferredRoleSelect');
+    const stageSelect = document.getElementById('stageRoleSelect');
+    if (sidebarSelect) sidebarSelect.value = selectedRole;
+    if (stageSelect) stageSelect.value = selectedRole;
+    document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
+      chip.classList.toggle('active', chip.dataset.role === selectedRole);
+    });
+    startNewGame('STANDARD', selectedRole);
+  };
+
+  document.getElementById('preferredRoleSelect')?.addEventListener('change', (e) => {
+    syncRoleChoiceAndRestart(e.target.value);
+  });
+  document.getElementById('stageRoleSelect')?.addEventListener('change', (e) => {
+    syncRoleChoiceAndRestart(e.target.value);
+  });
+  document.querySelectorAll('#roleQuickChips .role-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      syncRoleChoiceAndRestart(chip.dataset.role || 'RANDOM');
     });
   });
 

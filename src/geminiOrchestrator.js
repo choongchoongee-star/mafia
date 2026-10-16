@@ -120,7 +120,8 @@ export async function callArgonInteraction({
         };
       }
 
-      const timeoutMs = thinkingLevel === 'high' ? 9500 : 6000;
+      const timeoutMs =
+        thinkingLevel === 'high' ? 6500 : thinkingLevel === 'low' ? 1800 : 3500;
       const interaction = await Promise.race([
         client.interactions.create(requestPayload),
         new Promise((_, reject) =>
@@ -459,13 +460,16 @@ Return ONLY valid JSON:
   const ttsPayload = await synthesizeSpeechTTS({
     speakerId: leaderId,
     voiceName: idolProfile?.voiceName || 'Kore',
-    text: verified.text
-  });
-  const videoPayload = await triggerBackgroundVideoClip({
-    speakerId: leaderId,
     text: verified.text,
-    emotion: verified.emotion
+    skipTts: Boolean(game?.skipTts)
   });
+  const videoPayload = game?.skipTts
+    ? { videoUrl: null, videoTaskId: null, videoModel: 'text-only-mode' }
+    : await triggerBackgroundVideoClip({
+        speakerId: leaderId,
+        text: verified.text,
+        emotion: verified.emotion
+      });
 
   return {
     proposedTeamIds: candidateIds,
@@ -705,7 +709,8 @@ export async function generateDiscussionDebateTurn(
     const yieldTts = await synthesizeSpeechTTS({
       speakerId: yielderIdol.id,
       voiceName: yielderIdol.voiceName,
-      text: yieldLine
+      text: yieldLine,
+      skipTts: Boolean(game?.skipTts)
     });
     yieldTurnPayload = {
       speakerId: yielderIdol.id,
@@ -804,7 +809,8 @@ RULES FOR OUTPUT:
   const ttsPayload = await synthesizeSpeechTTS({
     speakerId: winnerIdol.id,
     voiceName: winnerIdol.voiceName,
-    text: verified.text
+    text: verified.text,
+    skipTts: Boolean(game?.skipTts)
   });
 
   return {
@@ -1494,13 +1500,16 @@ Return ONLY valid JSON:
   const ttsPayload = await synthesizeSpeechTTS({
     speakerId: assassinId,
     voiceName: assassinPlayer.voiceName,
-    text: verified.text
-  });
-  const videoPayload = await triggerBackgroundVideoClip({
-    speakerId: assassinId,
     text: verified.text,
-    emotion: 'suspicious'
+    skipTts: Boolean(game?.skipTts)
   });
+  const videoPayload = game?.skipTts
+    ? { videoUrl: null, videoTaskId: null, videoModel: 'text-only-mode' }
+    : await triggerBackgroundVideoClip({
+        speakerId: assassinId,
+        text: verified.text,
+        emotion: 'suspicious'
+      });
 
   return {
     targetPlayerId,
@@ -1524,9 +1533,23 @@ Return ONLY valid JSON:
  * @param {string} params.speakerId
  * @param {string} params.voiceName
  * @param {string} params.text
+ * @param {boolean} [params.skipTts=false]
  * @returns {Promise<{ audioBase64: string|null, audioMimeType: string|null, ttsModel: string, voiceName: string }>}
  */
-export async function synthesizeSpeechTTS({ speakerId, voiceName = 'Kore', text }) {
+export async function synthesizeSpeechTTS({
+  speakerId,
+  voiceName = 'Kore',
+  text,
+  skipTts = false
+}) {
+  if (skipTts) {
+    return {
+      audioBase64: null,
+      audioMimeType: null,
+      ttsModel: 'text-only-mode (TTS skipped)',
+      voiceName
+    };
+  }
   const client = getGenAiClient();
   if (!client || !text) {
     return {
@@ -1590,22 +1613,18 @@ export async function synthesizeSpeechTTS({ speakerId, voiceName = 'Kore', text 
  */
 export async function generatePhotorealisticPortrait(characterId) {
   const cachedFile = path.join(generatedDir, `portrait_${characterId}.png`);
-  const cachedVideoFile = path.join(generatedDir, `webcam_${characterId}.mp4`);
-  const videoUrl = fs.existsSync(cachedVideoFile)
-    ? `/generated/webcam_${characterId}.mp4`
-    : null;
 
   if (portraitCache.has(characterId)) {
     const cached = portraitCache.get(characterId);
-    return { ...cached, videoUrl: videoUrl || cached.videoUrl || null };
+    return { ...cached, videoUrl: null };
   }
 
   if (fs.existsSync(cachedFile)) {
     const result = {
       characterId,
       portraitUrl: `/generated/portrait_${characterId}.png`,
-      videoUrl,
-      modelUsed: 'gemini-omni-1.1-flash + gemini-nano-banana-2.1 (cached)'
+      videoUrl: null,
+      modelUsed: 'gemini-nano-banana-2.1 (cached)'
     };
     portraitCache.set(characterId, result);
     return result;
@@ -1621,7 +1640,7 @@ export async function generatePhotorealisticPortrait(characterId) {
     return {
       characterId,
       portraitUrl: null,
-      videoUrl,
+      videoUrl: null,
       modelUsed: 'gemini-nano-banana-2.1'
     };
   }
@@ -1648,7 +1667,7 @@ export async function generatePhotorealisticPortrait(characterId) {
           const result = {
             characterId,
             portraitUrl: `/generated/portrait_${characterId}.png`,
-            videoUrl,
+            videoUrl: null,
             modelUsed: imgModel
           };
           portraitCache.set(characterId, result);
@@ -1663,14 +1682,14 @@ export async function generatePhotorealisticPortrait(characterId) {
   return {
     characterId,
     portraitUrl: null,
-    videoUrl,
+    videoUrl: null,
     modelUsed: 'gemini-nano-banana-2.1'
   };
 }
 
 /**
- * Triggers or serves a real `.mp4` webcam video via `gemini-omni-1.1-flash` (`background: true`)
- * for photorealistic idol webcam talking/reaction clips.
+ * Triggers an optional companion video cutscene task via `gemini-omni-1.1-flash` (`background: true`)
+ * while preserving the Discord fixed 4K studio profile images (`portrait_<id>.png`) on all character tiles.
  *
  * @param {object} params
  * @param {string} params.speakerId
@@ -1684,54 +1703,19 @@ export async function triggerBackgroundVideoClip({
   emotion = 'speaking'
 }) {
   const taskId = `omni_${speakerId}_${Date.now()}`;
-  const cachedWebcamFile = path.join(generatedDir, `webcam_${speakerId}.mp4`);
-  const defaultVideoUrl = fs.existsSync(cachedWebcamFile)
-    ? `/generated/webcam_${speakerId}.mp4`
-    : null;
-
   const taskRecord = {
     taskId,
     speakerId,
-    status: defaultVideoUrl ? 'completed' : 'in_progress',
+    emotion,
+    status: 'fixed_portrait_mode',
     videoModel: 'gemini-omni-1.1-flash',
-    videoUrl: defaultVideoUrl,
+    videoUrl: null,
     createdAt: Date.now()
   };
   videoTaskCache.set(taskId, taskRecord);
 
-  // If the character doesn't have a cached webcam MP4 yet, generate one in background via gemini-omni-1.1-flash
-  const client = getGenAiClient();
-  if (client && !defaultVideoUrl) {
-    (async () => {
-      try {
-        if (client.interactions && typeof client.interactions.create === 'function') {
-          const safePrompt =
-            'Cinematic 16:9 live webcam broadcast shot of a poised 25-year-old Korean talk show panelist sitting at a modern podcast studio desk with a studio condenser microphone, looking into the webcam, nodding and speaking naturally, warm studio lighting.';
-          const created = await client.interactions.create({
-            model: 'gemini-omni-1.1-flash',
-            input: safePrompt,
-            background: true
-          });
-          for (let poll = 0; poll < 20; poll += 1) {
-            await new Promise((r) => setTimeout(r, 4000));
-            const state = await client.interactions.get(created.id);
-            if (state.status === 'completed' && state.output_video?.data) {
-              fs.writeFileSync(cachedWebcamFile, Buffer.from(state.output_video.data, 'base64'));
-              taskRecord.videoUrl = `/generated/webcam_${speakerId}.mp4`;
-              taskRecord.status = 'completed';
-              break;
-            }
-            if (state.status === 'failed' || state.status === 'cancelled') break;
-          }
-        }
-      } catch {
-        taskRecord.status = 'live_canvas_synced';
-      }
-    })();
-  }
-
   return {
-    videoUrl: taskRecord.videoUrl,
+    videoUrl: null,
     videoTaskId: taskId,
     videoModel: 'gemini-omni-1.1-flash'
   };
