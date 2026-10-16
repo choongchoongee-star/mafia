@@ -37,7 +37,8 @@ import {
   generatePhotorealisticPortrait,
   getVideoTaskStatus,
   transcribePlayerAudio,
-  generateAdaptiveBgmLoop
+  generateAdaptiveBgmLoop,
+  synthesizeSpeechTTS
 } from './src/geminiOrchestrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -70,6 +71,17 @@ const activeGames = new Map();
  * @returns {object}
  */
 function buildClientResponse(game, extra = {}) {
+  const recentTranscript = game.transcript.slice(-30);
+  const cutoffIdx = Math.max(0, recentTranscript.length - 2);
+  const leanTranscript = recentTranscript.map((item, idx) =>
+    idx >= cutoffIdx
+      ? item
+      : {
+          ...item,
+          hasAudio: Boolean(item.audioBase64),
+          audioBase64: null
+        }
+  );
   return {
     gameId: game.gameId,
     apiKeyConfigured: hasGeminiApiKey(),
@@ -77,12 +89,19 @@ function buildClientResponse(game, extra = {}) {
     players: game.players,
     board: getPublicBoardSummary(game),
     humanPrivateView: buildPrivatePlayerView(game, 'player_human'),
-    transcript: game.transcript.slice(-30),
+    transcript: leanTranscript,
     currentVotes: game.currentVotes,
     xrayTelemetry: buildJudgeXraySnapshot(game),
     ...extra
   };
 }
+
+/**
+ * Avoid browser 404 console noise on /favicon.ico.
+ */
+app.get('/favicon.ico', (_req, res) => {
+  res.status(204).end();
+});
 
 /**
  * Health & API key status endpoint.
@@ -117,6 +136,34 @@ app.post('/api/config/key', (req, res) => {
     apiKeyConfigured: hasGeminiApiKey()
   });
 });
+
+/**
+ * Helper to record an explicit human chat command in the transcript when the user operates a phase via chat.
+ * @param {object} game
+ * @param {string|null|undefined} humanChatText
+ * @param {string} phaseContext
+ * @returns {object|null}
+ */
+function recordHumanChatCommandTurn(game, humanChatText, phaseContext) {
+  if (!humanChatText || String(humanChatText).trim().length === 0) {
+    return null;
+  }
+  const cleanText = String(humanChatText).trim();
+  game.humanStats.messagesThisRound += 1;
+  game.humanStats.totalMessages += 1;
+  game.humanStats.lastSpokeAt = new Date().toISOString();
+
+  return appendTranscriptItem(game, {
+    speakerId: 'player_human',
+    text: cleanText,
+    emotion: 'speaking',
+    innerThought: `Live human chat command during ${phaseContext}.`,
+    modelUsed: 'Live-Human-Chat-Command',
+    thinkingLevel: 'medium',
+    verificationPassed: true,
+    verificationNote: `✅ Verified: Human chat command executed (${phaseContext}).`
+  });
+}
 
 /**
  * Starts a new 7-player Avalon game with cryptographically random roles.
@@ -165,7 +212,7 @@ app.get('/api/game/:gameId/state', (req, res) => {
 });
 
 /**
- * Executes the Leader's Quest Team Proposal (`20s` timer) and transitions to `DISCUSSION` (`75s` timer).
+ * Executes the Leader's Quest Team Proposal (`45s` timer) and transitions to `DISCUSSION` (`180s` timer).
  */
 app.post('/api/game/:gameId/propose', async (req, res) => {
   try {
@@ -174,20 +221,24 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { proposedTeamIds, skipTts } = req.body || {};
+    const { proposedTeamIds, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let latestTurn = null;
 
     if (game.leaderId === 'player_human') {
-      // Human Leader (or 20s auto-timeout fallback)
+      // Human Leader (or 45s auto-timeout fallback)
       const locked = lockTeamProposal(
         game,
         Array.isArray(proposedTeamIds) ? proposedTeamIds : []
       );
       const teamNames = locked.proposedTeamIds.map((id) => getPlayerName(game, id));
+      const customText =
+        humanChatText && String(humanChatText).trim().length > 0
+          ? `${String(humanChatText).trim()} → [${teamNames.join(', ')}]`
+          : `I'm proposing [${teamNames.join(', ')}] for Quest ${game.currentQuestNumber}. Let's hear everyone's thoughts!`;
       const humanTurn = appendTranscriptItem(game, {
         speakerId: 'player_human',
-        text: `I'm proposing [${teamNames.join(', ')}] for Quest ${game.currentQuestNumber}. Let's hear everyone's thoughts!`,
+        text: customText,
         emotion: 'speaking',
         innerThought: `Human Leader proposed [${teamNames.join(', ')}] for Quest ${game.currentQuestNumber}.`,
         modelUsed: 'Human-Leader-Input',
@@ -202,25 +253,24 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
       return res.json(
         buildClientResponse(game, {
           leaderTurn: humanTurn,
+          mcTurn: latestTurn,
           latestTurn
         })
       );
     }
 
+    if (humanChatText) {
+      recordHumanChatCommandTurn(game, humanChatText, `Quest ${game.currentQuestNumber} AI Leader Proposal Trigger`);
+    }
+
     // AI Idol is Leader — use `gemini-4-argon` (`thinking_level: "high"`)
     const aiProposal = await generateAiLeaderProposal(game);
-    const locked = lockTeamProposal(game, aiProposal.proposedTeamIds);
+    lockTeamProposal(game, aiProposal.proposedTeamIds);
     const leaderTurn = appendTranscriptItem(game, aiProposal.speechTurn);
-    const teamNames = locked.proposedTeamIds.map((id) => getPlayerName(game, id));
-    const mcTurnRaw = await generateMcJaesukCommentary(game, 'TEAM_PROPOSED', {
-      proposedTeamNames: teamNames
-    });
-    const mcTurn = appendTranscriptItem(game, mcTurnRaw);
 
     return res.json(
       buildClientResponse(game, {
         leaderTurn,
-        mcTurn,
         latestTurn: leaderTurn
       })
     );
@@ -230,10 +280,17 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
 });
 
 /**
- * Advances one live debate turn during the `75s` DISCUSSION phase,
+ * Advances one live debate turn during the `180s` DISCUSSION phase,
  * or processes the Human Player's live voice/text chat input and immediately generates an Idol response.
  */
 app.post('/api/game/:gameId/discuss/step', async (req, res) => {
+  let clientAborted = false;
+  req.on('close', () => {
+    if (!res.writableEnded) {
+      clientAborted = true;
+    }
+  });
+
   try {
     const game = activeGames.get(req.params.gameId);
     if (!game) {
@@ -244,7 +301,9 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       humanMessage = null,
       targetMemberId = null,
       elapsedRoundSec = 0,
-      skipTts
+      candidateTeamIds = [],
+      skipTts,
+      isAutoStep = false
     } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let humanStoredTurn = null;
@@ -260,7 +319,7 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
         text: cleanText,
         emotion: 'speaking',
         targetPlayerId: targetMemberId || null,
-        innerThought: `Live human input during Quest ${game.currentQuestNumber} discussion.`,
+        innerThought: `Live human input during Quest ${game.currentQuestNumber} (${game.phase}).`,
         modelUsed: 'Live-Human-Input',
         thinkingLevel: 'medium',
         verificationPassed: true,
@@ -268,11 +327,23 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       });
     }
 
+    const prevSpeakerHistoryLen = game.speakerHistoryThisRound.length;
     const aiDebateTurn = await generateDiscussionDebateTurn(game, {
       humanMessage: humanStoredTurn ? humanStoredTurn.text : null,
       targetMemberId,
-      elapsedRoundSec: Number(elapsedRoundSec) || 0
+      elapsedRoundSec: Number(elapsedRoundSec) || 0,
+      candidateTeamIds: Array.isArray(candidateTeamIds) ? candidateTeamIds : []
     });
+
+    // If this was a background auto-step and the client aborted it to prioritize a human action, discard cleanly
+    if (
+      isAutoStep &&
+      !humanStoredTurn &&
+      (clientAborted || (game.phase !== 'DISCUSSION' && game.phase !== 'TEAM_PROPOSAL'))
+    ) {
+      game.speakerHistoryThisRound.length = prevSpeakerHistoryLen;
+      return res.status(204).end();
+    }
 
     let yieldStoredTurn = null;
     if (aiDebateTurn.yieldTurn) {
@@ -296,12 +367,16 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
 });
 
 /**
- * Transitions from DISCUSSION to TEAM_VOTE (`15s` timer) when the 75s timer expires or Early Vote is clicked.
+ * Transitions from DISCUSSION to TEAM_VOTE (`30s` timer) when the 180s timer expires or Early Vote is triggered.
  */
 app.post('/api/game/:gameId/call-vote', (req, res) => {
   const game = activeGames.get(req.params.gameId);
   if (!game) {
     return res.status(404).json({ error: 'Game session not found' });
+  }
+  const { humanChatText = null } = req.body || {};
+  if (humanChatText) {
+    recordHumanChatCommandTurn(game, humanChatText, `Quest ${game.currentQuestNumber} Call Vote`);
   }
   startTeamVotePhase(game);
   return res.json(buildClientResponse(game));
@@ -317,8 +392,11 @@ app.post('/api/game/:gameId/vote', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { humanVote = null, skipTts } = req.body || {};
+    const { humanVote = null, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
+    if (humanChatText) {
+      recordHumanChatCommandTurn(game, humanChatText, `Quest ${game.currentQuestNumber} Team Vote (${humanVote})`);
+    }
     const allVotes = await generateParallelTeamVotes(game, humanVote);
     const voteResolution = resolveTeamVotes(game, allVotes);
 
@@ -346,8 +424,11 @@ app.post('/api/game/:gameId/quest', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { humanQuestCard = null, skipTts } = req.body || {};
+    const { humanQuestCard = null, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
+    if (humanChatText) {
+      recordHumanChatCommandTurn(game, humanChatText, `Quest ${game.currentQuestNumber} Mission Card`);
+    }
     const submittedCards = await generateQuestCards(game, humanQuestCard);
     const questOutcome = resolveQuestExecution(game, submittedCards);
 
@@ -375,8 +456,11 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
       return res.status(404).json({ error: 'Game session not found' });
     }
 
-    const { targetPlayerId = null, skipTts } = req.body || {};
+    const { targetPlayerId = null, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
+    if (humanChatText) {
+      recordHumanChatCommandTurn(game, humanChatText, 'Assassin Shot Target Selection');
+    }
     const decision = await generateAssassinDecision(game, targetPlayerId);
     const assassinTurn = appendTranscriptItem(game, decision.assassinSpeechTurn);
     const assassinationOutcome = resolveAssassination(
@@ -384,6 +468,13 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
       decision.targetPlayerId,
       decision.assassinSpeechTurn.innerThought
     );
+
+    const mcFinalTts = await synthesizeSpeechTTS({
+      speakerId: 'mc_jaesuk',
+      voiceName: MC_HOST_PROFILE.voiceName,
+      text: assassinationOutcome.winReason,
+      skipTts: Boolean(game?.skipTts)
+    });
 
     const mcFinalTurn = appendTranscriptItem(game, {
       speakerId: 'mc_jaesuk',
@@ -393,7 +484,8 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
       modelUsed: 'gemini-4-argon',
       thinkingLevel: 'low',
       verificationPassed: true,
-      verificationNote: '✅ Verified: Final Assassin shot and win condition resolved.'
+      verificationNote: '✅ Verified: Final Assassin shot and win condition resolved.',
+      ...mcFinalTts
     });
 
     return res.json(
@@ -405,6 +497,29 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
     );
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to resolve assassination' });
+  }
+});
+
+/**
+ * On-demand TTS synthesis endpoint (`gemini-3.8-flash-tts`) for replaying or testing character voices.
+ */
+app.post('/api/media/tts', async (req, res) => {
+  try {
+    const { speakerId = 'mc_jaesuk', text = '' } = req.body || {};
+    const profile =
+      speakerId === 'mc_jaesuk'
+        ? MC_HOST_PROFILE
+        : IDOL_CAST_PROFILES.find((p) => p.id === speakerId);
+    const voiceName = profile?.voiceName || 'Kore';
+    const ttsResult = await synthesizeSpeechTTS({
+      speakerId,
+      voiceName,
+      text: String(text || '').slice(0, 500),
+      skipTts: false
+    });
+    return res.json(ttsResult);
+  } catch (err) {
+    return res.status(500).json({ error: err.message || 'TTS synthesis failed' });
   }
 });
 

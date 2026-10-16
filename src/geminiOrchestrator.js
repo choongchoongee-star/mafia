@@ -146,8 +146,8 @@ export async function callArgonInteraction({
     // Fall through to fast companion model adapter if real-time broadcast turn exceeds latency budget
   }
 
-  // 2. Secondary path: Fast companion models (`gemini-3.5-flash-lite` / `gemini-3.8-flash`) for sub-2s real-time pacing
-  const candidateModels = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+  // 2. Secondary path: Fast companion models (`gemini-2.5-flash` / `gemini-3.5-flash-lite` / `gemini-3.8-flash`) for sub-2s real-time pacing
+  const candidateModels = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
 
   for (const candidateModel of candidateModels) {
     try {
@@ -229,6 +229,14 @@ export async function verifyAndHealUtterance(game, speakerId, draftResponse) {
   const targetPlayerId = draftResponse.targetPlayerId || null;
 
   const issues = [];
+
+  // Strip awkward repetitive "aigoo" / "aigo" interjections if any model ever emits them
+  if (/\b(aigoo+|aigo+)\b/i.test(text)) {
+    text = text
+      .replace(/\b(aigoo+|aigo+)\s*(,\s*ma)?[!~,.]*\s*/gi, '')
+      .replace(/^\s*([a-z])/, (_, c) => c.toUpperCase())
+      .trim();
+  }
 
   // Check 1: Prevent explicit forbidden role leaks
   if (role) {
@@ -362,20 +370,20 @@ function buildFallbackMcLine(game, eventType, contextData) {
   const humanName = getPlayerName(game, 'player_human');
   if (eventType === 'GAME_START') {
     if (game.demoPreset === 'QUEST_4_CRITICAL') {
-      return `Yeorobun, welcome back to IDOL AVALON! Evil leads 2 to 1 as we enter the critical 4-player Quest 4 where TWO Fails are required! Leader ${board.leaderName}, you have 20 seconds—who do you trust?!`;
+      return `Yeorobun, welcome back to IDOL AVALON! Evil leads 2 to 1 as we enter the critical 4-player Quest 4 where TWO Fails are required! Leader ${board.leaderName}, you have 45 seconds—who do you trust?!`;
     }
     if (game.demoPreset === 'ASSASSIN_CLIMAX') {
-      return `Daebak! The Good team just cleared 3 Quests, which means it is time for the final ASSASSIN SHOT! Evil team, you have 30 seconds to unmask MERLIN and steal the game!`;
+      return `Daebak! The Good team just cleared 3 Quests, which means it is time for the final ASSASSIN SHOT! Evil team, you have 60 seconds to unmask MERLIN and steal the game!`;
     }
-    return `Welcome to IDOL AVALON LIVE! Seven players—Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana, and our special guest ${humanName}—with secret roles randomly dealt! Leader ${board.leaderName}, pick ${board.requiredTeamSize} members for Quest 1 in 20 seconds!`;
+    return `Welcome to IDOL AVALON LIVE! Seven players—Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana, and our special guest ${humanName}—with secret roles randomly dealt! Leader ${board.leaderName}, pick ${board.requiredTeamSize} members for Quest 1 in 45 seconds!`;
   }
   if (eventType === 'TEAM_PROPOSED') {
     const teamStr = (contextData.proposedTeamNames || board.proposedTeamNames).join(', ');
-    return `Leader ${board.leaderName} has locked in [${teamStr}] for Quest ${board.currentQuestNumber}! Put 75 seconds on the clock—idols and ${humanName}, debate now before the automatic vote!`;
+    return `Leader ${board.leaderName} has locked in [${teamStr}] for Quest ${board.currentQuestNumber}! Put 3 minutes on the clock—idols and ${humanName}, debate now or call an early vote when ready!`;
   }
   if (eventType === 'VOTE_RESULT') {
     if (contextData.approved) {
-      return `Votes are in: ${contextData.approveCount} APPROVE to ${contextData.rejectCount} REJECT! The team [${contextData.proposedTeamNames.join(', ')}] is heading into Quest ${contextData.questNumber}—lock your secret Quest cards in 15 seconds!`;
+      return `Votes are in: ${contextData.approveCount} APPROVE to ${contextData.rejectCount} REJECT! The team [${contextData.proposedTeamNames.join(', ')}] is heading into Quest ${contextData.questNumber}—lock your secret Quest cards in 25 seconds!`;
     }
     return `Ooh, REJECTED ${contextData.rejectCount} to ${contextData.approveCount}! The Reject Track moves to ${board.rejectTrack}/5, and the Leader crown passes to ${board.leaderName}!`;
   }
@@ -401,12 +409,12 @@ export async function generateAiLeaderProposal(game) {
   const activeQuest = getActiveQuest(game);
   const requiredSize = activeQuest.teamSize;
 
-  const prompt = `You are playing a 7-player game of The Resistance: Avalon on a live K-Pop Variety Show Zoom call.
-YOUR IDENTITY, NAMUWIKI PROFILE & PERSONA:
+  const prompt = `You are playing a 7-player game of The Resistance: Avalon on a live K-Pop Variety Show Discord call.
+YOUR IDENTITY & PERSONA:
 - Name: ${privateView.self.name} (${privateView.self.koreanName || ''} — ${privateView.self.archetype})
-- Namuwiki Character Background (MBTI, Favorite Foods, Nicknames, Habits): ${JSON.stringify(privateView.self.namuwikiProfile || {})}
+- Character Background: ${JSON.stringify(privateView.self.namuwikiProfile || {})}
 - Personality: ${privateView.self.personality}
-- Speech Style: ${privateView.self.speechStyle}
+- Conversational Tone: ${privateView.self.speechStyle}
 - Secret Role: ${privateView.self.roleName} (${privateView.self.alignment})
 - ${privateView.epistemicVision.nightVisionText}
 
@@ -418,15 +426,16 @@ CURRENT BOARD STATE:
 - Recent Transcript: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
 
 TASK:
-Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a natural, convincing 1-2 sentence speech in English explaining why everyone should vote APPROVE on your team (feel free to sprinkle in your signature dialect or a quick reference to your Namuwiki favorite food/habit!).
+Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a natural, convincing 1-2 sentence speech in English explaining why everyone should vote APPROVE on your team.
 - If you are GOOD: pick the cleanest, least suspicious players (and if you are Merlin, avoid Evil players without sounding omniscient!).
 - If you are EVIL: include yourself or 1 Evil teammate blended with trusted Good players so the table approves your squad!
+- STRICT DIALOGUE RULE: Never use the word "Aigoo" or "Aigo", do NOT force food bets or repetitive catchphrases, and vary your opening phrasing naturally.
 
 Return ONLY valid JSON:
 {
   "proposedTeamIds": ["${leaderId}", ...],
   "innerThought": "Your secret strategic reasoning as ${privateView.self.roleName}",
-  "text": "Your spoken English announcement to the Zoom call (20-38 words)",
+  "text": "Your spoken English announcement to the call (20-38 words)",
   "emotion": "speaking"
 }`;
 
@@ -594,15 +603,16 @@ export async function generateDiscussionDebateTurn(
   const secondaryBid = sortedBids[1];
 
   // Detect Simultaneous Mic Collision & Polite Yield (`COLLISION_YIELD`)
-  // Happens when 2 agents both have high urgency (>= 72) and want to jump in at the same time
+  // Happens occasionally when 2 agents both have very high urgency (>= 84 and >= 78)
   const hadRecentCollision = game.lastFloorEvent?.type === 'COLLISION_YIELD';
   const isMicCollision =
     !humanMessage &&
     !hadRecentCollision &&
+    game.transcript.length % 3 === 1 &&
     primaryBid &&
     secondaryBid &&
-    primaryBid.urgency >= 73 &&
-    secondaryBid.urgency >= 69;
+    primaryBid.urgency >= 84 &&
+    secondaryBid.urgency >= 78;
 
   let winnerBid = primaryBid;
   let yielderBid = null;
@@ -704,10 +714,11 @@ export async function generateDiscussionDebateTurn(
   const proposedNames = game.proposedTeamIds.map((id) => getPlayerName(game, id));
 
   let yieldTurnPayload = null;
+  let yieldTtsPromise = null;
   if (yielderBid) {
     const yielderIdol = aiPlayers.find((p) => p.id === yielderBid.speakerId);
     const yieldLine = buildDialectMicYieldLine(yielderIdol, winnerIdol, yielderBid.draft.text);
-    const yieldTts = await synthesizeSpeechTTS({
+    yieldTtsPromise = synthesizeSpeechTTS({
       speakerId: yielderIdol.id,
       voiceName: yielderIdol.voiceName,
       text: yieldLine,
@@ -726,19 +737,18 @@ export async function generateDiscussionDebateTurn(
       thinkingLevel: 'low',
       verificationPassed: true,
       verificationNote: 'Verified: Multi-Agent Floor Yield & Epistemic Check Passed',
-      ...yieldTts,
       videoUrl: null,
       videoTaskId: null
     };
   }
 
-  const prompt = `You are an autonomous AI agent playing a live 7-player game of The Resistance: Avalon on a K-Pop Variety Show Zoom call.
-YOUR DISTINCT CHARACTER, NAMUWIKI PROFILE, DIALECT & SECRET ROLE:
+  const prompt = `You are an autonomous AI agent playing a live 7-player game of The Resistance: Avalon on a K-Pop Variety Show Discord call.
+YOUR CHARACTER & SECRET ROLE:
 - Name: ${winnerPrivateView.self.name} (${winnerPrivateView.self.koreanName || ''} — ${winnerPrivateView.self.archetype})
-- Namuwiki Character Background (Motif, MBTI, Favorite Foods, Nicknames, Habits): ${JSON.stringify(winnerPrivateView.self.namuwikiProfile || {})}
-- Signature Dialect / Vibe: ${winnerPrivateView.self.dialectTag}
+- Character Background (Reference ONLY rarely when natural, never force into every turn): ${JSON.stringify(winnerPrivateView.self.namuwikiProfile || {})}
+- Vibe: ${winnerPrivateView.self.dialectTag}
 - Personality: ${winnerPrivateView.self.personality}
-- MANDATORY Speech & Dialect Style: ${winnerPrivateView.self.speechStyle}
+- Conversational Tone: ${winnerPrivateView.self.speechStyle}
 - Secret Avalon Role: ${winnerPrivateView.self.roleName} (${winnerPrivateView.self.alignment})
 - ${winnerPrivateView.epistemicVision.nightVisionText}
 
@@ -746,7 +756,7 @@ MULTI-AGENT FLOOR CONTEXT RIGHT NOW:
 - Your Agent Floor Decision: ${winnerBid.intent} (Urgency: ${winnerBid.urgency}/100)
 - ${
     yielderBid
-      ? `MIC COLLISION EVENT: You and ${yielderBid.speakerName} just unmuted at the exact same time! ${yielderBid.speakerName} just yielded the mic to you saying: "${yieldTurnPayload.text}". Briefly acknowledge ${yielderBid.speakerName} in the first 3-5 words (in your signature style!) before delivering your main point!`
+      ? `MIC COLLISION EVENT: You and ${yielderBid.speakerName} just unmuted at the exact same time! ${yielderBid.speakerName} just yielded the mic to you saying: "${yieldTurnPayload.text}". Briefly acknowledge ${yielderBid.speakerName} in 2-4 natural words before delivering your main point!`
       : `Other idols currently holding strategic silence: [${sortedBids
           .filter((b) => b.intent === 'HOLD_SILENT')
           .map((b) => b.speakerName)
@@ -764,19 +774,22 @@ CURRENT BOARD STATE:
 
 ${
   humanMessage
-    ? `CRITICAL LIVE INPUT: Special Guest (${humanPlayer.name}) just said to the room: "${humanMessage}". Respond DIRECTLY and specifically to what ${humanPlayer.name} just said in your unmistakable dialect/persona (${winnerPrivateView.self.dialectTag}) while acting according to your secret role (${winnerPrivateView.self.roleName})!`
+    ? `CRITICAL LIVE INPUT: Special Guest (${humanPlayer.name}) just said to the room: "${humanMessage}". Respond DIRECTLY and specifically to what ${humanPlayer.name} just said while acting according to your secret role (${winnerPrivateView.self.roleName})!`
     : isBystanderSilent
-      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly in your signature dialect (${winnerPrivateView.self.dialectTag})—ask if they are hiding as Merlin or playing Oberon while commenting on [${proposedNames.join(', ')}]!`
-      : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your unmistakable dialect/persona (${winnerPrivateView.self.dialectTag}), Namuwiki character quirks, and secret role strategy (${winnerPrivateView.self.roleName})!`
+      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly—ask if they are hiding as Merlin or playing Oberon while commenting on [${proposedNames.join(', ')}]!`
+      : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
 }
 
-RULES FOR OUTPUT:
-- Speak in natural, punchy English infused with your character's signature regional dialect/slang (${winnerPrivateView.self.dialectTag}) and occasional fun references to your Namuwiki favorite foods/MBTI/nicknames — 1 to 2 sentences (22-42 words).
+STRICT ANTI-REPETITION & NATURAL DIALOGUE RULES:
+- Speak in natural, smart, conversational English like a real 20-year-old K-Pop idol — 1 to 2 sentences (20-38 words).
+- NEVER use the word "Aigoo" or "Aigo" under any circumstances.
+- NEVER repeat opening interjections, slang words, or food bets (such as "Mwo-ra-ka-no", "Fair dinkum", "Dodok-nom", "Geu-ryeo", or betting food) that already appeared in Recent Live Conversation.
+- Focus 90% of your line on concrete Avalon game logic (vote history, team overlap, why you trust or doubt specific players) and vary your sentence openings every turn.
 - Never reveal forbidden role knowledge directly (if Merlin, disguise your knowledge as vote/behavior analysis!).
 - Return ONLY valid JSON:
 {
   "innerThought": "Your private internal Avalon role strategy & acting reason as ${winnerPrivateView.self.roleName}",
-  "text": "Your spoken dialogue on the Zoom call in your signature dialect/persona",
+  "text": "Your spoken dialogue on the call",
   "emotion": "speaking" | "suspicious" | "shocked",
   "targetPlayerId": "player_id_you_are_questioning_or_addressing"
 }`;
@@ -808,12 +821,19 @@ RULES FOR OUTPUT:
   }
 
   const verified = await verifyAndHealUtterance(game, winnerIdol.id, rawDraft);
-  const ttsPayload = await synthesizeSpeechTTS({
-    speakerId: winnerIdol.id,
-    voiceName: winnerIdol.voiceName,
-    text: verified.text,
-    skipTts: Boolean(game?.skipTts)
-  });
+  const [ttsPayload, yieldTts] = await Promise.all([
+    synthesizeSpeechTTS({
+      speakerId: winnerIdol.id,
+      voiceName: winnerIdol.voiceName,
+      text: verified.text,
+      skipTts: Boolean(game?.skipTts)
+    }),
+    yieldTtsPromise || Promise.resolve(null)
+  ]);
+
+  if (yieldTurnPayload && yieldTts) {
+    Object.assign(yieldTurnPayload, yieldTts);
+  }
 
   return {
     speakerId: winnerIdol.id,
@@ -835,6 +855,51 @@ RULES FOR OUTPUT:
   };
 }
 
+const IDOL_BILINGUAL_ALIASES = {
+  idol_wonyoung: ['서영', '원영', '럭키서영', 'seoyoung', 'wonyoung'],
+  idol_karina: ['리나', '카리나', 'rina', 'karina'],
+  idol_sullyoon: ['설아', '설윤', 'seol-ah', 'seolah', 'sullyoon'],
+  idol_yuna: ['유라', '유나', 'yura', 'yuna'],
+  idol_chaewon: ['채린', '채원', '쌈채린', 'chaerin', 'chaewon'],
+  idol_hanni: ['하나', '하니', 'hana', 'hanni']
+};
+
+/**
+ * Returns the 0-based order in which `idol` was mentioned in `humanMessage` (or -1 if not mentioned).
+ * Supports both Korean (`서영아`, `리나 생각은`) and English (`Seoyoung`, `Rina`) names.
+ * @param {string|null} humanMessage
+ * @param {object} game
+ * @param {string} idolId
+ * @returns {number}
+ */
+function getIdolMentionOrderInMessage(humanMessage, game, idolId) {
+  if (!humanMessage || typeof humanMessage !== 'string') return -1;
+  const lower = humanMessage.toLowerCase();
+  const hits = [];
+
+  for (const player of game.players) {
+    if (player.isHuman) continue;
+    const aliases = IDOL_BILINGUAL_ALIASES[player.id] || [
+      player.name?.toLowerCase(),
+      player.koreanName
+    ].filter(Boolean);
+    let earliestIdx = Infinity;
+    for (const alias of aliases) {
+      if (!alias) continue;
+      const idx = lower.indexOf(alias.toLowerCase());
+      if (idx !== -1 && idx < earliestIdx) {
+        earliestIdx = idx;
+      }
+    }
+    if (earliestIdx !== Infinity) {
+      hits.push({ id: player.id, idx: earliestIdx });
+    }
+  }
+
+  hits.sort((a, b) => a.idx - b.idx);
+  return hits.findIndex((h) => h.id === idolId);
+}
+
 /**
  * Evaluates a single AI Idol NPC agent's independent floor bid (`INTERRUPT` | `SPEAK` | `HOLD_SILENT`)
  * conditioned strictly on her isolated `PrivatePlayerView` (secret role, night vision, Bayesian suspicion, and persona).
@@ -854,11 +919,10 @@ async function evaluateSingleIdolFloorBid(
   const justSpokeLast = lastSpeakerId === idol.id;
   const wasJustAccusedOrAddressed = lastTargetId === idol.id;
 
-  // Check if human explicitly mentioned or targeted this idol
+  // Check if human explicitly mentioned or targeted this idol (in Korean or English)
+  const mentionOrder = getIdolMentionOrderInMessage(humanMessage, game, idol.id);
   const humanNamedMe =
-    Boolean(humanMessage) &&
-    (targetMemberId === idol.id ||
-      new RegExp(`\\b${idol.name}\\b`, 'i').test(humanMessage));
+    Boolean(humanMessage) && (targetMemberId === idol.id || mentionOrder !== -1);
 
   // Build contextual role-driven draft in this idol's signature dialect
   const draft = buildContextualDebateFallback(
@@ -866,7 +930,8 @@ async function evaluateSingleIdolFloorBid(
     privateView,
     idol,
     humanMessage,
-    isBystanderSilent
+    isBystanderSilent,
+    humanNamedMe
   );
 
   // Compute strategic urgency & intent based on secret Avalon role + situational triggers
@@ -875,7 +940,11 @@ async function evaluateSingleIdolFloorBid(
   let strategicSilenceThought = null;
 
   if (humanNamedMe) {
-    urgency = 97;
+    // First mentioned idol gets 99 urgency; second mentioned idol gets 95 urgency
+    urgency = mentionOrder === 0 ? 99 : mentionOrder === 1 ? 95 : 93;
+    if (justSpokeLast && mentionOrder > 0) {
+      urgency = 91;
+    }
     intent = 'INTERRUPT';
   } else if (justSpokeLast) {
     urgency = 16;
@@ -981,21 +1050,21 @@ async function evaluateSingleIdolFloorBid(
  * Builds the short, natural cut-off & yield line when two idols open their mics simultaneously.
  */
 function buildDialectMicYieldLine(yielderIdol, winnerIdol, intendedText) {
-  const snippet = intendedText.split(/[,.!?]/)[0]?.slice(0, 28) || 'Wait, look at the team';
+  const snippet = intendedText.split(/[,.!?]/)[0]?.slice(0, 26) || 'Wait, look at the team';
   switch (yielderIdol.id) {
     case 'idol_sullyoon':
-      return `Aigoo, ma! ${snippet}— oh! 미안 (Sorry) ${winnerIdol.name} unnie, we turned on our mics at the exact same time! Go ahead first, Seol-ah will drop her Busan bomb right after you~`;
+      return `Wait, ${snippet}— oh, sorry ${winnerIdol.name}, we unmuted at the same time. Go ahead first, I'll share my read right after you.`;
     case 'idol_wonyoung':
-      return `Excuse me, I was just going to say— oh my~✨ ${winnerIdol.name} unnie, you look so urgent right now! Ladies first, go ahead and speak before Seoyoung~`;
+      return `I was just going to say— oh, ${winnerIdol.name}, you unmuted right with me! Go ahead first, I'll follow up right after.`;
     case 'idol_yuna':
-      return `Hold on, ${snippet}— aigoo, geu-ryeo (그려)~ ${winnerIdol.name} unnie jumped right in too! Go right ahead unnie, let's hear your big theory first~`;
+      return `Hold on, ${snippet}— oh, ${winnerIdol.name} jumped in at the exact same second! Go right ahead, let's hear your point first.`;
     case 'idol_hanni':
-      return `Oi wait, ${snippet}— oh crikey, ${winnerIdol.name} and I just clashed on the mic! No worries mate, you go first and Hana will jump in after!`;
+      return `Wait on, ${snippet}— oh, ${winnerIdol.name} and I just clashed on the mic! You go first, I'll jump in right after.`;
     case 'idol_karina':
-      return `Wait, check the— hold on, ${winnerIdol.name} and I unmuted together. Make your point fast, ${winnerIdol.name}, then Rina is breaking down the vote math.`;
+      return `Wait, check the— hold on, ${winnerIdol.name} and I unmuted together. Make your point first, ${winnerIdol.name}, then I'll break down the votes.`;
     case 'idol_chaewon':
     default:
-      return `Yo, hold up— ah, ${winnerIdol.name}, we both grabbed the mic at once! Say your piece in 5 seconds, go ahead!`;
+      return `Hold up— ah, ${winnerIdol.name}, we both grabbed the mic at once! Go ahead and make your point first.`;
   }
 }
 
@@ -1007,43 +1076,81 @@ function prependCollisionHandoffPhrase(winnerIdol, yielderName, baseText) {
     case 'idol_karina':
       return `Thanks, ${yielderName}. ${baseText}`;
     case 'idol_chaewon':
-      return `Appreciate it, ${yielderName}! ${baseText}`;
+      return `Appreciate it, ${yielderName}. ${baseText}`;
     case 'idol_hanni':
-      return `Cheers ${yielderName}, mate! ${baseText}`;
+      return `Thanks ${yielderName}! ${baseText}`;
     case 'idol_sullyoon':
-      return `Gomawo (고마워) ${yielderName} unnie~ ${baseText}`;
+      return `Thank you, ${yielderName}. ${baseText}`;
     case 'idol_yuna':
-      return `Geu-ryeo (그려), thanks ${yielderName} unnie~ ${baseText}`;
+      return `Thanks ${yielderName}~ ${baseText}`;
     case 'idol_wonyoung':
     default:
-      return `Thank you ${yielderName} unnie, so sweet of you~✨ ${baseText}`;
+      return `Thank you, ${yielderName}. ${baseText}`;
   }
 }
 
 /**
- * Infuses an idol's signature regional dialect, Namuwiki trivia (favorite foods/MBTI/habits), and speech mannerisms into her spoken dialogue.
+ * Infuses an idol's natural conversational tone into fallback dialogue using a rotating pool
+ * so lines never repeat the same opening or closing phrase.
  */
-function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'unnie') {
+function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone') {
+  const variantIdx = (coreSentence.length + targetName.length) % 4;
   switch (speakerId) {
-    case 'idol_sullyoon':
-      // Seol-ah: Busan Satoori Sniper + ISFP Malatang/Bread lover
-      return `Aigoo, ma! Mwo-ra-ka-no (뭐라카노)? ${coreSentence} Ddaeng (땡)—I'd bet my favorite salt bread and level-2.5 malatang that logic is jin-jja shady!`;
-    case 'idol_yuna':
-      // Yura: Chungcheong Sarcasm + ENFP Floorball Ace / Pizza & Gukbap lover
-      return `Oh sure~ geu-ryeo (그려)~ ${coreSentence} Real nice job helping Mordred out, my ENFP floorball-ace instinct smells a trap from a mile away~`;
-    case 'idol_hanni':
-      // Hana: Melbourne Aussie Slang + INFP Baguette/Mint-Choco lover
-      return `Oi mate, fair dinkum—${coreSentence} No worries though, I reckon ${targetName} just walked right into Hana's Melbourne logic trap!`;
-    case 'idol_wonyoung':
-      // Seoyoung: Posh "Lucky Seoyoung" Princess + ISTP Strawberry/Hanwoo lover
-      return `Excuse me, everyone~✨ ${coreSentence} Honestly, catching this now is so Lucky Seoyoung for us—I swear on my favorite fresh strawberries!`;
-    case 'idol_chaewon':
-      // Chaerin: Fierce Street-Boss + ISTP Ssam-Chaerin "Dodok-nom!" meme
-      return `Yo, cut the act right now, dodok-nom (도독놈)! ${coreSentence} Explain yourself to Ssam-Chaerin in 5 seconds or I'm smashing Reject, period!`;
+    case 'idol_sullyoon': {
+      const variants = [
+        `Wait a second—${coreSentence} That doesn't match the earlier vote pattern at all.`,
+        `I've been listening quietly, and ${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`,
+        `${coreSentence} Honestly, that contradiction is really hard to ignore right now.`,
+        `Hold on, let's think about this carefully. ${coreSentence}`
+      ];
+      return variants[variantIdx];
+    }
+    case 'idol_yuna': {
+      const variants = [
+        `${coreSentence} Funny how everyone suddenly gets quiet when that comes up, right?`,
+        `Wait a minute~ ${coreSentence} Let's see how ${targetName} explains that one.`,
+        `${coreSentence} If we approve this blindly, Evil is going to thank us for the free point.`,
+        `Hold on, look at how fast this lineup came together—${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`
+      ];
+      return variants[variantIdx];
+    }
+    case 'idol_hanni': {
+      const variants = [
+        `Hang on a second—${coreSentence} I reckon ${targetName} needs to explain that vote.`,
+        `${coreSentence} Honestly, that whole excuse sounds a bit dodgy to me.`,
+        `Wait on, let's look at the numbers. ${coreSentence}`,
+        `${coreSentence} Let's hear what ${targetName} has to say before we lock our votes.`
+      ];
+      return variants[variantIdx];
+    }
+    case 'idol_wonyoung': {
+      const variants = [
+        `Listen for a second, everyone—${coreSentence}`,
+        `${coreSentence} Catching this before we vote is actually a huge advantage for the Good team.`,
+        `Honestly, if we look at the board calmly, ${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`,
+        `${coreSentence} Let's make sure we don't hand Mordred an easy round here.`
+      ];
+      return variants[variantIdx];
+    }
+    case 'idol_chaewon': {
+      const variants = [
+        `Let's be real right now: ${coreSentence}`,
+        `${coreSentence} Give us a straight answer before the vote timer runs out.`,
+        `Hold up, we can't afford a careless vote here. ${coreSentence}`,
+        `${coreSentence} If nobody can justify this pick, I'm voting Reject.`
+      ];
+      return variants[variantIdx];
+    }
     case 'idol_karina':
-    default:
-      // Rina: Ice-Cold Prosecutor Math + ENFP Tonkatsu/Mint-Choco gamer
-      return `Stop deflecting and look at the exact vote matrix. ${coreSentence} Mathematically, I'd bet my favorite tonkatsu and mint-choco that's a massive red flag.`;
+    default: {
+      const variants = [
+        `Look at the vote ledger from the last round. ${coreSentence}`,
+        `${coreSentence} Statistically, we need to verify that slot before approving.`,
+        `Let's focus on the actual numbers here: ${coreSentence}`,
+        `${coreSentence} That's the main risk factor on the board right now.`
+      ];
+      return variants[variantIdx];
+    }
   }
 }
 
@@ -1056,7 +1163,8 @@ function buildContextualDebateFallback(
   privateView,
   speaker,
   humanMessage,
-  isBystanderSilent
+  isBystanderSilent,
+  humanNamedMe = false
 ) {
   const role = privateView.self;
   const humanPlayer = game.players.find((p) => p.isHuman);
@@ -1073,13 +1181,17 @@ function buildContextualDebateFallback(
   // Case A: Direct live reply to the Human Player's message!
   if (humanMessage) {
     const cleanMsg = humanMessage.trim();
-    const isQuestion = cleanMsg.includes('?');
+    const isQuestion = cleanMsg.includes('?') || /어때|믿어도|누구|왜|진짜|생각/i.test(cleanMsg);
+    const calloutPrefix = humanNamedMe
+      ? `${humanPlayer.name}, since you called on ${speaker.name} directly`
+      : `Hearing what ${humanPlayer.name} just said ("${cleanMsg.slice(0, 32)}")`;
+
     if (role.alignment === 'EVIL') {
       return {
-        innerThought: `As ${role.roleName} (Evil), ${humanPlayer.name} just said "${cleanMsg}". I need to deflect suspicion onto ${topTeamSuspect.playerName} in my ${speaker.dialectTag} persona while sounding like a loyal Good Citizen.`,
+        innerThought: `As ${role.roleName} (Evil), ${humanPlayer.name} just said "${cleanMsg}". I'm jumping in (${humanNamedMe ? 'since my name was called!' : 'to steer the room'}) to deflect suspicion onto ${topTeamSuspect.playerName} while sounding like a loyal Good Citizen.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `Wait ${humanPlayer.name}, you said "${cleanMsg.slice(0, 42)}", but if we don't watch ${topTeamSuspect.playerName} on [${proposedNames.join(', ')}], Quest ${activeQuest.questNumber} is in big trouble!`,
+          `${calloutPrefix}—on [${proposedNames.join(', ')}], you can trust me 100%, but ${topTeamSuspect.playerName}'s vote track for Quest ${activeQuest.questNumber} is super suspicious!`,
           humanPlayer.name
         ),
         emotion: isQuestion ? 'speaking' : 'suspicious',
@@ -1087,10 +1199,10 @@ function buildContextualDebateFallback(
       };
     }
     return {
-      innerThought: `As ${role.roleName} (Good), ${humanPlayer.name} raised a point ("${cleanMsg}"). Cross-checking against my suspicion matrix where ${topTeamSuspect.playerName} sits at ${Math.round(topTeamSuspect.evilProbability * 100)}% Evil probability.`,
+      innerThought: `As ${role.roleName} (Good), ${humanPlayer.name} raised a live point ("${cleanMsg}"). Cross-checking against my suspicion matrix where ${topTeamSuspect.playerName} sits at ${Math.round(topTeamSuspect.evilProbability * 100)}% Evil probability.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `I heard what ${humanPlayer.name} just said about "${cleanMsg.slice(0, 40)}", and my biggest worry on [${proposedNames.join(', ')}] is still ${topTeamSuspect.playerName}!`,
+        `${calloutPrefix}—looking at [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}, my biggest red flag is still ${topTeamSuspect.playerName}!`,
         topTeamSuspect.playerName
       ),
       emotion: 'speaking',
@@ -1527,16 +1639,81 @@ Return ONLY valid JSON:
 }
 
 /**
+ * Strips non-audio trailing chunks (such as `C2PA` provenance metadata) from a RIFF WAVE buffer
+ * and builds a clean 44-byte standard PCM WAV header + `data` payload for 100% browser compatibility.
+ * Also calculates the exact audio duration in milliseconds from the PCM byte rate.
+ *
+ * @param {string} base64Data
+ * @returns {{ cleanBase64: string, audioDurationMs: number|null }}
+ */
+function sanitizeWavBase64(base64Data) {
+  try {
+    const buf = Buffer.from(base64Data, 'base64');
+    if (
+      buf.length < 44 ||
+      buf.toString('ascii', 0, 4) !== 'RIFF' ||
+      buf.toString('ascii', 8, 12) !== 'WAVE'
+    ) {
+      return { cleanBase64: base64Data, audioDurationMs: null };
+    }
+
+    let fmtData = null;
+    let pcmData = null;
+    let offset = 12;
+
+    while (offset + 8 <= buf.length) {
+      const chunkId = buf.toString('ascii', offset, offset + 4);
+      const chunkSize = buf.readUInt32LE(offset + 4);
+      const payloadStart = offset + 8;
+      const payloadEnd = Math.min(buf.length, payloadStart + chunkSize);
+
+      if (chunkId === 'fmt ' && payloadEnd - payloadStart >= 16) {
+        fmtData = buf.subarray(payloadStart, payloadStart + 16);
+      } else if (chunkId === 'data') {
+        pcmData = buf.subarray(payloadStart, payloadEnd);
+        break;
+      }
+      offset = payloadStart + chunkSize + (chunkSize % 2);
+    }
+
+    if (!fmtData || !pcmData || pcmData.length === 0) {
+      return { cleanBase64: base64Data, audioDurationMs: null };
+    }
+
+    const byteRate = fmtData.readUInt32LE(8) || 48000;
+    const audioDurationMs = Math.max(600, Math.round((pcmData.length / byteRate) * 1000));
+
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0, 'ascii');
+    header.writeUInt32LE(36 + pcmData.length, 4);
+    header.write('WAVE', 8, 'ascii');
+    header.write('fmt ', 12, 'ascii');
+    header.writeUInt32LE(16, 16);
+    fmtData.copy(header, 20, 0, 16);
+    header.write('data', 36, 'ascii');
+    header.writeUInt32LE(pcmData.length, 40);
+
+    const cleanWav = Buffer.concat([header, pcmData]);
+    return {
+      cleanBase64: cleanWav.toString('base64'),
+      audioDurationMs
+    };
+  } catch {
+    return { cleanBase64: base64Data, audioDurationMs: null };
+  }
+}
+
+/**
  * Synthesizes expressive English speech using `gemini-3.8-flash-tts` (`gemini-3.8-flash-lite-tts`).
- * Returns `audioBase64` when live TTS audio bytes are returned, plus full voice synthesis parameters
- * so the client audio engine can play neural voice with real-time Web Audio waveform analysis.
+ * Returns `audioBase64` when live TTS audio bytes are returned, plus `audioDurationMs` and full voice
+ * synthesis parameters so the client audio engine can play neural voice with Web Audio API decoding.
  *
  * @param {object} params
  * @param {string} params.speakerId
  * @param {string} params.voiceName
  * @param {string} params.text
  * @param {boolean} [params.skipTts=false]
- * @returns {Promise<{ audioBase64: string|null, audioMimeType: string|null, ttsModel: string, voiceName: string }>}
+ * @returns {Promise<{ audioBase64: string|null, audioMimeType: string|null, audioDurationMs: number|null, ttsModel: string, voiceName: string }>}
  */
 export async function synthesizeSpeechTTS({
   speakerId,
@@ -1548,15 +1725,18 @@ export async function synthesizeSpeechTTS({
     return {
       audioBase64: null,
       audioMimeType: null,
+      audioDurationMs: null,
       ttsModel: 'text-only-mode (TTS skipped)',
       voiceName
     };
   }
   const client = getGenAiClient();
-  if (!client || !text) {
+  const cleanText = String(text || '').trim();
+  if (!client || !cleanText) {
     return {
       audioBase64: null,
       audioMimeType: null,
+      audioDurationMs: null,
       ttsModel: 'gemini-3.8-flash-tts (client-neural-sync)',
       voiceName
     };
@@ -1564,43 +1744,49 @@ export async function synthesizeSpeechTTS({
 
   const candidateTtsModels = [
     'gemini-3.8-flash-tts',
-    'gemini-3.8-flash-lite-tts',
-    'gemini-2.5-flash-preview-tts'
+    'gemini-3.8-flash-lite-tts'
   ];
 
+  const candidateVoices = voiceName && voiceName !== 'Kore' ? [voiceName, 'Kore'] : ['Kore'];
+
   for (const ttsModel of candidateTtsModels) {
-    try {
-      const response = await client.models.generateContent({
-        model: ttsModel,
-        contents: text,
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName }
+    for (const candidateVoice of candidateVoices) {
+      try {
+        const response = await client.models.generateContent({
+          model: ttsModel,
+          contents: cleanText,
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: candidateVoice }
+              }
             }
           }
-        }
-      });
+        });
 
-      const inlineData =
-        response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
-      if (inlineData?.data) {
-        return {
-          audioBase64: inlineData.data,
-          audioMimeType: inlineData.mimeType || 'audio/wav',
-          ttsModel,
-          voiceName
-        };
+        const inlineData =
+          response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
+        if (inlineData?.data) {
+          const { cleanBase64, audioDurationMs } = sanitizeWavBase64(inlineData.data);
+          return {
+            audioBase64: cleanBase64,
+            audioMimeType: inlineData.mimeType || 'audio/wav',
+            audioDurationMs,
+            ttsModel,
+            voiceName: candidateVoice
+          };
+        }
+      } catch {
+        // Try fallback voice or next TTS model candidate
       }
-    } catch {
-      // Try next TTS model candidate
     }
   }
 
   return {
     audioBase64: null,
     audioMimeType: null,
+    audioDurationMs: null,
     ttsModel: 'gemini-3.8-flash-tts',
     voiceName
   };
@@ -1815,7 +2001,7 @@ export async function generateAdaptiveBgmLoop(mood = 'discussion', forceRegenera
   if (!forceRegenerate && fs.existsSync(cachedFile)) {
     const cachedResult = {
       mood: safeMood,
-      bgmUrl: `/generated/bgm_${safeMood}.mp3`,
+      bgmUrl: `/generated/bgm_${safeMood}.mp3?v=loop_v2`,
       modelUsed: 'lyria-3-clip-preview (cached)',
       mimeType: 'audio/mpeg'
     };
@@ -1835,13 +2021,13 @@ export async function generateAdaptiveBgmLoop(mood = 'discussion', forceRegenera
 
   const moodPrompts = {
     discussion:
-      'Upbeat suspenseful K-pop variety show mystery background music, rhythmic synth bass, light electronic percussion, clever detective mind-game atmosphere, instrumental loop',
+      'Steady continuous minimal ambient electronic lounge loop, soft warm Rhodes chords, subtle steady 108 BPM muted synth pulse, uniform volume throughout with no intro, no outro, no breakdowns, no pauses, and no beat drops, seamless background music loop',
     vote:
-      'High tension countdown voting music for a Korean television game show, ticking synth pulse, dramatic electronic strings, suspenseful decision atmosphere, instrumental loop',
+      'Steady continuous minimal ticking synth pulse loop at 112 BPM, soft ambient tension pad, constant unbroken rhythm and uniform volume throughout with no intro, no outro, no breakdowns, and no pauses, seamless background music loop',
     quest:
-      'Cinematic futuristic quest execution soundtrack, cyber-fantasy K-pop synthwave, dramatic anticipation build-up, instrumental loop',
+      'Steady continuous atmospheric cyber-synth pad and gentle arpeggio loop at 110 BPM, uniform calm volume throughout with no intro, no outro, no breakdowns, no dramatic stops, and no beat drops, seamless background music loop',
     assassin:
-      'Dark dramatic final showdown thriller soundtrack, deep heartbeat bass, tense orchestral strings and modern dark synth, high stakes climax, instrumental loop'
+      'Steady continuous dark ambient low heartbeat pulse and warm drone pad loop at 100 BPM, uniform subtle volume throughout with no intro, no outro, no breakdowns, and no pauses, seamless background music loop'
   };
 
   const lyriaModels = ['lyria-3-clip-preview', 'lyria-3.5'];
@@ -1857,7 +2043,7 @@ export async function generateAdaptiveBgmLoop(mood = 'discussion', forceRegenera
         fs.writeFileSync(cachedFile, Buffer.from(audioPart.inlineData.data, 'base64'));
         const result = {
           mood: safeMood,
-          bgmUrl: `/generated/bgm_${safeMood}.mp3`,
+          bgmUrl: `/generated/bgm_${safeMood}.mp3?v=loop_v2`,
           modelUsed: lyriaModel,
           mimeType: audioPart.inlineData.mimeType || 'audio/mpeg'
         };

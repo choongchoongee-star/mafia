@@ -42,6 +42,9 @@ const state = {
   lastTurnFinishedAt: 0,
   isBusyRequest: false,
   isWaitingServer: false,
+  isPlayingAudio: false,
+  autoStepAbortController: null,
+  pendingHumanChatQueue: [],
   preferredRole: 'RANDOM',
   gameStartSeq: 0,
   portraitImages: new Map(),
@@ -54,10 +57,122 @@ const state = {
   bgmSourceNode: null,
   bgmBufferCache: new Map(),
   currentBgmMood: null,
-  playingBgmMood: null
+  playingBgmMood: null,
+  turnAudioCache: new Map(),
+  voiceGainNode: null,
+  activeVoiceSourceNode: null,
+  voiceAudioEl: null,
+  activeVoiceBlobUrl: null,
+  activeSpeechResolve: null,
+  audioUnlocked: false,
+  pendingAutoplayTurn: null
 };
 
 const MAX_BGM_LINEAR_GAIN = 0.045; // Even 100% slider is capped at a gentle 4.5% linear amplitude
+
+/**
+ * Ensures the shared Web Audio API `AudioContext`, `bgmGainNode`, `voiceGainNode`,
+ * and persistent `HTMLAudioElement` (`voiceAudioEl`) are initialized.
+ * Only constructs `AudioContext` after a user gesture (`state.audioUnlocked`) to avoid browser console warnings.
+ * @returns {AudioContext|null}
+ */
+function ensureAudioEngineReady() {
+  if (!state.voiceAudioEl && typeof Audio !== 'undefined') {
+    state.voiceAudioEl = new Audio();
+    state.voiceAudioEl.preload = 'auto';
+    state.voiceAudioEl.volume = 1.0;
+  }
+  if (!state.audioUnlocked) {
+    return state.bgmAudioCtx;
+  }
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (AudioCtx && !state.bgmAudioCtx) {
+    try {
+      state.bgmAudioCtx = new AudioCtx();
+      state.bgmGainNode = state.bgmAudioCtx.createGain();
+      state.bgmGainNode.gain.value = getEffectiveBgmGain();
+      state.bgmGainNode.connect(state.bgmAudioCtx.destination);
+
+      state.voiceGainNode = state.bgmAudioCtx.createGain();
+      state.voiceGainNode.gain.value = 1.0;
+      state.voiceGainNode.connect(state.bgmAudioCtx.destination);
+    } catch {
+      // Ignore AudioContext initialization errors
+    }
+  }
+  return state.bgmAudioCtx;
+}
+
+/**
+ * Caches a turn's synthesized `audioBase64` so it can be replayed from the chat transcript
+ * even after older transcript items have their base64 stripped in subsequent payloads.
+ * @param {object|null} turn
+ */
+function cacheTurnAudio(turn) {
+  if (!turn || !turn.audioBase64) return;
+  const payload = {
+    audioBase64: turn.audioBase64,
+    audioMimeType: turn.audioMimeType || 'audio/wav',
+    audioDurationMs: turn.audioDurationMs || null,
+    speakerId: turn.speakerId,
+    speakerName: turn.speakerName,
+    text: turn.text
+  };
+  if (turn.id) {
+    state.turnAudioCache.set(turn.id, payload);
+  }
+  const textKey = `${turn.speakerId || ''}:${String(turn.text || '').slice(0, 120)}`;
+  state.turnAudioCache.set(textKey, payload);
+}
+
+/**
+ * Shows or hides a floating banner prompting the user to click once if browser autoplay blocked the initial greeting.
+ * @param {boolean} show
+ */
+function showAutoplayUnlockBanner(show) {
+  let banner = document.getElementById('autoplayUnlockBanner');
+  if (!show) {
+    if (banner) banner.remove();
+    return;
+  }
+  if (!banner) {
+    const topBar = document.querySelector('.stage-top-bar');
+    if (!topBar) return;
+    banner = document.createElement('button');
+    banner.id = 'autoplayUnlockBanner';
+    banner.type = 'button';
+    banner.className = 'autoplay-unlock-banner';
+    banner.innerHTML = '<span>🔊</span><span>Click anywhere to hear live character voices</span>';
+    topBar.appendChild(banner);
+  }
+}
+
+/**
+ * Unlocks Web Audio API & HTMLAudioElement playback on the user's first interaction
+ * and immediately replays any turn that was blocked by browser autoplay policy on page load.
+ */
+function setupAudioUnlockListeners() {
+  const unlock = () => {
+    const wasUnlocked = state.audioUnlocked;
+    state.audioUnlocked = true;
+    const ctx = ensureAudioEngineReady();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    if (!wasUnlocked) {
+      syncPhaseAdaptiveBgm();
+    }
+    showAutoplayUnlockBanner(false);
+    if (state.pendingAutoplayTurn && state.audioEnabled) {
+      const queuedTurn = state.pendingAutoplayTurn;
+      state.pendingAutoplayTurn = null;
+      playTurnVoiceAndHighlight(queuedTurn);
+    }
+  };
+  ['pointerdown', 'click', 'touchstart', 'keydown'].forEach((evtName) => {
+    window.addEventListener(evtName, unlock, { passive: true });
+  });
+}
 
 /**
  * Computes the effective linear BGM gain (0.0 to 0.045), applying automatic
@@ -216,6 +331,23 @@ function applyServerGameState(data) {
   state.currentVotes = data.currentVotes || {};
   state.xrayTelemetry = data.xrayTelemetry || null;
 
+  [data.latestTurn, data.yieldTurn, data.leaderTurn, data.mcTurn, data.assassinTurn].forEach((t) =>
+    cacheTurnAudio(t)
+  );
+  state.transcript.forEach((item) => {
+    if (item.audioBase64) {
+      cacheTurnAudio(item);
+    } else {
+      const textKey = `${item.speakerId || ''}:${String(item.text || '').slice(0, 120)}`;
+      const cached = state.turnAudioCache.get(item.id) || state.turnAudioCache.get(textKey);
+      if (cached) {
+        item.audioBase64 = cached.audioBase64;
+        item.audioMimeType = cached.audioMimeType;
+        item.audioDurationMs = cached.audioDurationMs;
+      }
+    }
+  });
+
   if (previousPhase !== state.board.phase) {
     resetPhaseClock(state.board.phaseTimerSec);
   }
@@ -264,16 +396,10 @@ async function syncPhaseAdaptiveBgm() {
     const data = await res.json();
     if (!data.bgmUrl || !state.bgmEnabled || state.bgmUserPercent <= 0) return;
 
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      if (!state.bgmAudioCtx) {
-        state.bgmAudioCtx = new AudioCtx();
-        state.bgmGainNode = state.bgmAudioCtx.createGain();
-        state.bgmGainNode.gain.value = getEffectiveBgmGain();
-        state.bgmGainNode.connect(state.bgmAudioCtx.destination);
-      }
-      if (state.bgmAudioCtx.state === 'suspended') {
-        state.bgmAudioCtx.resume().catch(() => {});
+    const ctx = ensureAudioEngineReady();
+    if (ctx) {
+      if (ctx.state === 'suspended' && state.audioUnlocked) {
+        ctx.resume().catch(() => {});
       }
 
       let audioBuffer = state.bgmBufferCache.get(data.bgmUrl);
@@ -845,6 +971,11 @@ function renderTranscriptAndXray() {
               ? '<span class="msg-meta" style="color:#4ade80">🎙️ Took Floor After Yield</span>'
               : '';
 
+        const replayBtnHtml =
+          item.speakerId !== 'player_human'
+            ? `<button type="button" class="msg-replay-btn" data-replay-id="${item.id}" title="Play / Replay Character Voice">🔊</button>`
+            : '';
+
         return `
           <div class="discord-msg">
             ${avatarEl}
@@ -854,6 +985,7 @@ function renderTranscriptAndXray() {
                 <span class="msg-meta">Q${item.questNumber}</span>
                 ${dialectHtml}
                 ${floorBadgeHtml}
+                ${replayBtnHtml}
               </div>
               <div class="msg-text">${item.text}</div>
             </div>
@@ -972,8 +1104,9 @@ async function triggerTeamProposal(proposedTeamIds = []) {
     state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
-      if (data.leaderTurn) {
-        await playTurnVoiceAndHighlight(data.leaderTurn);
+      const turnToPlay = data.leaderTurn || data.mcTurn || data.latestTurn;
+      if (turnToPlay) {
+        await playTurnVoiceAndHighlight(turnToPlay);
       }
       state.lastTurnFinishedAt = Date.now();
     }
@@ -1176,6 +1309,7 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
 async function triggerAssassination(targetPlayerId = null) {
   if (!state.gameId || state.isBusyRequest) return;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   try {
     const res = await fetch(`/api/game/${state.gameId}/assassinate`, {
       method: 'POST',
@@ -1186,17 +1320,165 @@ async function triggerAssassination(targetPlayerId = null) {
       })
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
       if (data.assassinTurn) {
-        playTurnVoiceAndHighlight(data.assassinTurn);
+        await playTurnVoiceAndHighlight(data.assassinTurn);
       }
+      if (data.latestTurn && data.latestTurn.id !== data.assassinTurn?.id) {
+        await playTurnVoiceAndHighlight(data.latestTurn);
+      }
+      state.lastTurnFinishedAt = Date.now();
     }
   } catch (err) {
     console.error('Assassination error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
+}
+
+/**
+ * Converts a base64 string into a `Uint8Array` for Web Audio / Blob playback.
+ * @param {string} base64
+ * @returns {Uint8Array}
+ */
+function base64ToUint8Array(base64) {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Stops any currently playing voice audio node/element without clearing new speaker state.
+ */
+function stopActiveVoiceAudioOnly() {
+  if (state.activeVoiceSourceNode) {
+    try {
+      state.activeVoiceSourceNode.onended = null;
+      state.activeVoiceSourceNode.stop();
+      state.activeVoiceSourceNode.disconnect();
+    } catch {
+      // Ignore already stopped source
+    }
+    state.activeVoiceSourceNode = null;
+  }
+  if (state.voiceAudioEl) {
+    try {
+      state.voiceAudioEl.onended = null;
+      state.voiceAudioEl.onerror = null;
+      state.voiceAudioEl.pause();
+    } catch {
+      // Ignore pause errors
+    }
+  }
+  if (state.activeVoiceBlobUrl) {
+    try {
+      URL.revokeObjectURL(state.activeVoiceBlobUrl);
+    } catch {
+      // Ignore revoke errors
+    }
+    state.activeVoiceBlobUrl = null;
+  }
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // Ignore speechSynthesis errors
+    }
+  }
+  if (typeof state.activeSpeechResolve === 'function') {
+    const prevResolve = state.activeSpeechResolve;
+    state.activeSpeechResolve = null;
+    prevResolve();
+  }
+}
+
+/**
+ * Plays a turn using the browser's built-in `window.speechSynthesis` neural voices as a fallback.
+ * @param {object} turn
+ * @param {number} estimatedDurationMs
+ * @returns {Promise<void>}
+ */
+function playBrowserSpeechFallback(turn, estimatedDurationMs) {
+  const text = String(turn.text || '');
+  if (!('speechSynthesis' in window) || !text) {
+    if (state.activeSpeakerId === turn.speakerId) {
+      clearActiveSpeakerState();
+    } else {
+      setBgmDucking(false);
+    }
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+
+      const voices = window.speechSynthesis.getVoices();
+      const playerObj = state.players.find((p) => p.id === turn.speakerId);
+
+      if (turn.speakerId === 'mc_jaesuk') {
+        const maleVoice = voices.find(
+          (v) => /en/i.test(v.lang) && /(male|david|guy|daniel|mark|google us english)/i.test(v.name)
+        );
+        if (maleVoice) utterance.voice = maleVoice;
+        utterance.pitch = 1.05;
+        utterance.rate = 1.08;
+      } else {
+        const femaleVoices = voices.filter(
+          (v) => /en/i.test(v.lang) && /(female|zira|samantha|aria|jenny|victoria|google)/i.test(v.name)
+        );
+        const seatIdx = playerObj?.seatIndex || 0;
+        if (femaleVoices.length > 0) {
+          utterance.voice = femaleVoices[seatIdx % femaleVoices.length];
+        }
+        utterance.pitch = playerObj?.pitchOffset || 1.08;
+        utterance.rate = playerObj?.rateOffset || 1.04;
+      }
+
+      utterance.onboundary = (event) => {
+        if (typeof event.charIndex === 'number') {
+          state.activeSpeechCharIndex = event.charIndex;
+        }
+      };
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (state.activeSpeechResolve === finish) {
+          state.activeSpeechResolve = null;
+        }
+        if (state.activeSpeakerId === turn.speakerId) {
+          clearActiveSpeakerState();
+        } else {
+          setBgmDucking(false);
+        }
+        resolve();
+      };
+
+      state.activeSpeechResolve = finish;
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      setTimeout(finish, estimatedDurationMs + 1500);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      if (state.activeSpeakerId === turn.speakerId) {
+        clearActiveSpeakerState();
+      } else {
+        setBgmDucking(false);
+      }
+      resolve();
+    }
+  });
 }
 
 /**
@@ -1205,9 +1487,26 @@ async function triggerAssassination(targetPlayerId = null) {
  * @param {object} turn
  * @returns {Promise<void>}
  */
-function playTurnVoiceAndHighlight(turn) {
-  if (!turn) return Promise.resolve();
+async function playTurnVoiceAndHighlight(turn) {
+  if (!turn) return;
+  stopActiveVoiceAudioOnly();
+
   const text = String(turn.text || '');
+  const textKey = `${turn.speakerId || ''}:${text.slice(0, 120)}`;
+  const cachedAudio = state.turnAudioCache.get(turn.id) || state.turnAudioCache.get(textKey);
+  const audioBase64 = turn.audioBase64 || cachedAudio?.audioBase64 || null;
+  const audioMimeType = turn.audioMimeType || cachedAudio?.audioMimeType || 'audio/wav';
+  const serverDurationMs = Number(turn.audioDurationMs || cachedAudio?.audioDurationMs || 0);
+
+  if (audioBase64) {
+    cacheTurnAudio({
+      ...turn,
+      audioBase64,
+      audioMimeType,
+      audioDurationMs: serverDurationMs || undefined
+    });
+  }
+
   state.activeSpeakerId = turn.speakerId;
   state.activeSpeechText = text;
   state.activeSpeechStartTime = Date.now();
@@ -1216,16 +1515,17 @@ function playTurnVoiceAndHighlight(turn) {
 
   const isYieldTurn = turn.floorEventType === 'COLLISION_YIELD';
   const wordCount = text.split(/\s+/).filter(Boolean).length;
-  const estimatedDurationMs = isYieldTurn
-    ? Math.max(1400, Math.min(2800, wordCount * 280))
-    : Math.max(2600, Math.min(8500, wordCount * 310));
+  const fallbackDurationMs = isYieldTurn
+    ? Math.max(1800, Math.min(4500, wordCount * 320))
+    : Math.max(3200, Math.min(18000, wordCount * 380));
+  const estimatedDurationMs = serverDurationMs > 400 ? serverDurationMs : fallbackDurationMs;
   state.activeSpeechEndTime = Date.now() + estimatedDurationMs;
 
   renderZoomGrid();
   renderSidebarVoiceMembers();
 
   if (!state.audioEnabled) {
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       setTimeout(() => {
         if (state.activeSpeakerId === turn.speakerId) {
           clearActiveSpeakerState();
@@ -1233,95 +1533,198 @@ function playTurnVoiceAndHighlight(turn) {
         resolve();
       }, Math.min(estimatedDurationMs, isYieldTurn ? 1500 : 2800));
     });
+    return;
   }
 
   setBgmDucking(true);
+  const ctx = ensureAudioEngineReady();
 
-  if (turn.audioBase64) {
+  if (audioBase64) {
     try {
-      return new Promise((resolve) => {
-        const audio = new Audio(`data:${turn.audioMimeType || 'audio/wav'};base64,${turn.audioBase64}`);
-        audio.volume = 1.0;
-        let settled = false;
-        const finish = () => {
-          if (settled) return;
-          settled = true;
-          if (state.activeSpeakerId === turn.speakerId) {
-            clearActiveSpeakerState();
-          } else {
-            setBgmDucking(false);
-          }
-          resolve();
-        };
-        audio.onended = finish;
-        audio.onerror = finish;
-        setTimeout(finish, estimatedDurationMs + 1200);
-        audio.play().catch(finish);
-      });
-    } catch {
-      // Fall through to browser neural TTS
-    }
-  }
+      const wavBytes = base64ToUint8Array(audioBase64);
 
-  if ('speechSynthesis' in window) {
-    try {
-      return new Promise((resolve) => {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-
-        const voices = window.speechSynthesis.getVoices();
-        const playerObj = state.players.find((p) => p.id === turn.speakerId);
-
-        if (turn.speakerId === 'mc_jaesuk') {
-          const maleVoice = voices.find(
-            (v) => /en/i.test(v.lang) && /(male|david|guy|daniel|mark|google us english)/i.test(v.name)
-          );
-          if (maleVoice) utterance.voice = maleVoice;
-          utterance.pitch = 1.05;
-          utterance.rate = 1.08;
-        } else {
-          const femaleVoices = voices.filter(
-            (v) => /en/i.test(v.lang) && /(female|zira|samantha|aria|jenny|victoria|google)/i.test(v.name)
-          );
-          const seatIdx = playerObj?.seatIndex || 0;
-          if (femaleVoices.length > 0) {
-            utterance.voice = femaleVoices[seatIdx % femaleVoices.length];
-          }
-          utterance.pitch = playerObj?.pitchOffset || 1.08;
-          utterance.rate = playerObj?.rateOffset || 1.04;
+      // 1. If Web Audio API AudioContext is unlocked & running, decode and play directly through voiceGainNode
+      if (ctx) {
+        if (ctx.state === 'suspended' && state.audioUnlocked) {
+          await ctx.resume().catch(() => {});
         }
+        if (ctx.state === 'running' && state.voiceGainNode) {
+          try {
+            const arrayBuf = wavBytes.buffer.slice(
+              wavBytes.byteOffset,
+              wavBytes.byteOffset + wavBytes.byteLength
+            );
+            const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+            const durationMs = Math.max(800, Math.round(audioBuffer.duration * 1000));
+            state.activeSpeechEndTime = Date.now() + durationMs;
 
-        utterance.onboundary = (event) => {
-          if (typeof event.charIndex === 'number') {
-            state.activeSpeechCharIndex = event.charIndex;
+            await new Promise((resolve) => {
+              let settled = false;
+              const finish = () => {
+                if (settled) return;
+                settled = true;
+                if (state.activeSpeechResolve === finish) {
+                  state.activeSpeechResolve = null;
+                }
+                state.activeVoiceSourceNode = null;
+                if (state.activeSpeakerId === turn.speakerId) {
+                  clearActiveSpeakerState();
+                } else {
+                  setBgmDucking(false);
+                }
+                resolve();
+              };
+
+              state.activeSpeechResolve = finish;
+              const source = ctx.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(state.voiceGainNode);
+              source.onended = finish;
+              state.activeVoiceSourceNode = source;
+              setTimeout(finish, durationMs + 1500);
+              source.start(0);
+            });
+            return;
+          } catch {
+            // Fall through to HTMLAudioElement Blob playback if decodeAudioData fails
           }
-        };
+        }
+      }
 
+      // 2. Play via persistent HTMLAudioElement with Blob URL (handles initial page load & detects Autoplay blocks)
+      const blob = new Blob([wavBytes], { type: audioMimeType });
+      const blobUrl = URL.createObjectURL(blob);
+      state.activeVoiceBlobUrl = blobUrl;
+      const audio = state.voiceAudioEl || new Audio();
+      state.voiceAudioEl = audio;
+      audio.src = blobUrl;
+      audio.volume = 1.0;
+
+      const playedViaElement = await new Promise((resolve) => {
         let settled = false;
-        const finish = () => {
+        let safetyTimer = null;
+        const finish = (didPlay) => {
           if (settled) return;
           settled = true;
-          if (state.activeSpeakerId === turn.speakerId) {
-            clearActiveSpeakerState();
-          } else {
-            setBgmDucking(false);
+          if (safetyTimer) clearTimeout(safetyTimer);
+          if (state.activeSpeechResolve === finishAsResolved) {
+            state.activeSpeechResolve = null;
           }
-          resolve();
+          if (state.activeVoiceBlobUrl === blobUrl) {
+            URL.revokeObjectURL(blobUrl);
+            state.activeVoiceBlobUrl = null;
+          }
+          if (didPlay) {
+            if (state.activeSpeakerId === turn.speakerId) {
+              clearActiveSpeakerState();
+            } else {
+              setBgmDucking(false);
+            }
+          }
+          resolve(didPlay);
         };
+        const finishAsResolved = () => finish(true);
+        state.activeSpeechResolve = finishAsResolved;
 
-        utterance.onend = finish;
-        utterance.onerror = finish;
-        setTimeout(finish, estimatedDurationMs + 800);
-        window.speechSynthesis.speak(utterance);
+        audio.onloadedmetadata = () => {
+          if (Number.isFinite(audio.duration) && audio.duration > 0) {
+            const realDurationMs = Math.round(audio.duration * 1000);
+            state.activeSpeechEndTime = Date.now() + realDurationMs;
+            if (safetyTimer) clearTimeout(safetyTimer);
+            safetyTimer = setTimeout(() => finish(true), realDurationMs + 2000);
+          }
+        };
+        audio.onended = () => finish(true);
+        audio.onerror = () => finish(false);
+        safetyTimer = setTimeout(() => finish(true), estimatedDurationMs + 2500);
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              state.audioUnlocked = true;
+              showAutoplayUnlockBanner(false);
+            })
+            .catch((err) => {
+              if (err && err.name === 'NotAllowedError') {
+                // Browser blocked autoplay prior to first user click — queue turn for instant replay on click!
+                state.pendingAutoplayTurn = {
+                  ...turn,
+                  audioBase64,
+                  audioMimeType,
+                  audioDurationMs: estimatedDurationMs
+                };
+                showAutoplayUnlockBanner(true);
+                setTimeout(() => finish(true), Math.min(estimatedDurationMs, 2400));
+              } else {
+                finish(false);
+              }
+            });
+        }
       });
-    } catch {
-      // Ignore speech synthesis errors
+
+      if (playedViaElement) {
+        return;
+      }
+    } catch (err) {
+      console.warn('WAV TTS playback failed, falling back to browser speech:', err);
     }
   }
 
-  setBgmDucking(false);
-  return Promise.resolve();
+  // 3. Fallback to Browser Neural SpeechSynthesis
+  await playBrowserSpeechFallback(turn, estimatedDurationMs);
+}
+
+/**
+ * Replays or synthesizes on-demand TTS for any message in `#transcriptList` when its `🔊` button is clicked.
+ * @param {string} turnId
+ */
+async function replayTranscriptItemVoice(turnId) {
+  const item = state.transcript.find((t) => t.id === turnId);
+  if (!item) return;
+
+  if (!state.audioEnabled) {
+    state.audioEnabled = true;
+    document.getElementById('audioToggleBtn')?.classList.add('active');
+    const labelEl = document.getElementById('audioToggleLabel');
+    if (labelEl) labelEl.textContent = 'Voice ON';
+  }
+
+  const textKey = `${item.speakerId || ''}:${String(item.text || '').slice(0, 120)}`;
+  const cached = state.turnAudioCache.get(item.id) || state.turnAudioCache.get(textKey);
+  if (item.audioBase64 || cached?.audioBase64) {
+    await playTurnVoiceAndHighlight({
+      ...item,
+      audioBase64: item.audioBase64 || cached.audioBase64,
+      audioMimeType: item.audioMimeType || cached.audioMimeType || 'audio/wav',
+      audioDurationMs: item.audioDurationMs || cached.audioDurationMs
+    });
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/media/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        speakerId: item.speakerId,
+        text: item.text
+      })
+    });
+    if (res.ok) {
+      const ttsData = await res.json();
+      if (ttsData.audioBase64) {
+        item.audioBase64 = ttsData.audioBase64;
+        item.audioMimeType = ttsData.audioMimeType || 'audio/wav';
+        item.audioDurationMs = ttsData.audioDurationMs;
+        cacheTurnAudio(item);
+      }
+    }
+  } catch {
+    // Ignore on-demand TTS fetch error and let playTurnVoiceAndHighlight use fallback
+  }
+
+  await playTurnVoiceAndHighlight(item);
 }
 
 function clearActiveSpeakerState() {
@@ -1334,10 +1737,8 @@ function clearActiveSpeakerState() {
 }
 
 function stopActiveSpeech() {
+  stopActiveVoiceAudioOnly();
   clearActiveSpeakerState();
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
 }
 
 function getOrInitAvatarAnimState(id) {
@@ -1762,10 +2163,20 @@ function setupMicrophoneInput() {
  */
 function initApp() {
   preloadPortraitImages();
+  setupAudioUnlockListeners();
   startWebcamAnimationLoop();
   startAutonomousPhaseTimer();
   setupMicrophoneInput();
   setupChatDrawerResizer();
+
+  // Per-Message Voice Replay Button Delegation (`#transcriptList`)
+  document.getElementById('transcriptList')?.addEventListener('click', (e) => {
+    const replayBtn = e.target.closest('.msg-replay-btn');
+    if (replayBtn && replayBtn.dataset.replayId) {
+      e.stopPropagation();
+      replayTranscriptItemVoice(replayBtn.dataset.replayId);
+    }
+  });
 
   // Live Chat Form Submit
   const chatForm = document.getElementById('liveChatForm');

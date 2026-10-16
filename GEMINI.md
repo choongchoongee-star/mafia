@@ -28,12 +28,18 @@
 ---
 
 ## 3. Current Status
-- **Phase**: Phase 6 — Pre-Generated 4K K-Pop Visual Center Studio Portraits (`public/generated/portrait_idol_*.png`), Original Idol Stage Names (`Seoyoung 서영`, `Rina 리나`, `Seol-ah 설아`, `Yura 유라`, `Chaerin 채린`, `Hana 하나`, `MC Jae-ho 유재호`), Detailed Namuwiki-Based Character Background Lore (`namuwikiProfile`: MBTI, favorite foods, nicknames, hobbies, iconic habits), and 6-Agent Independent Parallel Floor Negotiation Live on `http://localhost:8080`, GitHub (`https://github.com/choongchoongee-star/mafia.git`), and **Google Cloud Run** (`https://idol-avalon-live-oyxmbnqija-du.a.run.app`).
-- **Remaining Sprint Time**: ~1 hour 25 mins (Submission & Judging begins at 15:20 KST).
+- **Phase**: Phase 6 — Pre-Generated 4K K-Pop Visual Center Studio Portraits (`public/generated/portrait_idol_*.png`), Original Idol Stage Names (`Seoyoung 서영`, `Rina 리나`, `Seol-ah 설아`, `Yura 유라`, `Chaerin 채린`, `Hana 하나`, `MC Jae-ho 유재호`), Sanitized 24kHz RIFF WAV TTS Engine (`gemini-3.8-flash-tts` with Autoplay Unlock/Replay & Web Audio `GainNode` Ducking), Detailed Namuwiki-Based Character Background Lore (`namuwikiProfile`), and 6-Agent Independent Parallel Floor Negotiation Live on `http://localhost:8080`, GitHub (`https://github.com/choongchoongee-star/mafia.git`), and **Google Cloud Run** (`https://idol-avalon-live-oyxmbnqija-du.a.run.app`).
+- **Remaining Sprint Time**: ~1 hour 05 mins (Submission & Judging begins at 15:20 KST).
 
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 14:13 KST] Task 20: Character TTS Speech Root-Cause Fix — RIFF WAV `C2PA` Sanitization, Valid Voice Profiles, Autoplay Unlock/Replay & Web Audio Voice Pipeline**
+  - **Action**:
+    1. Diagnosed and resolved 5 concrete root causes of silent/cut-off character speech across [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md), [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js), [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js), [server.js](file:///c:/Users/Charlie/Business/Projects/mafia/server.js), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
+    2. Replaced Chaerin's (`idol_chaewon`) invalid voice `'Callirhoe'` (which returned HTTP 400 in `gemini-3.8-flash-tts`) with `'Despina'`, added automatic `'Kore'` voice retry in `synthesizeSpeechTTS`, and added `sanitizeWavBase64` to strip trailing 6,062-byte `C2PA` metadata chunks and compute exact `audioDurationMs` from the 24kHz 16-bit PCM byte stream.
+    3. Rebuilt `playTurnVoiceAndHighlight` in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) to decode WAV audio via Web Audio API (`voiceGainNode` at `1.0`) and `Blob` URL `<audio>` without the premature 8.5s cutoff, detect `NotAllowedError` browser autoplay blocks on page load (`#autoplayUnlockBanner` + instant replay on first user click), fall back cleanly to `window.speechSynthesis` when needed, play `mcTurn`/`latestTurn` on Human Leader proposals and Assassin resolution, and provide per-message `🔊` voice replay buttons (`POST /api/media/tts`) in `#transcriptList`.
+  - **Result**: Verified live via `/api/media/tts` (`status: 200, hasC2pa: false`) and `/api/game/new`, syntax checked (`node --check`), pushed to GitHub, and redeployed to Google Cloud Run.
 - **[2026-10-16 14:03 KST] Task 19: Web Audio API `GainNode` BGM Attenuation (`0.008` Default Gain), Speech Auto-Ducking (`25%`), & Dedicated `🎵 BGM` Toggle + Slider**
   - **Action**:
     1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) to document the Web Audio API `GainNode` BGM pipeline, ultra-low default ambient gain (`0.0081`), automatic 75% ducking (`0.0020`) during TTS speech, and independent BGM toggle/slider.
@@ -59,11 +65,3 @@
     2. Removed the legacy frontend 11-second polling wait (`state.discussionElapsedSec - state.lastAutoBeatSec >= 11`) in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`startAutonomousPhaseTimer`) so that as soon as any speaker finishes their audio (`state.lastTurnFinishedAt`), the next 6-Idol parallel floor bid (`Promise.all(aiPlayers.map(idol => evaluateSingleIdolFloorBid(...)))`) fires after a natural `2.6s` breath.
     3. Added `state.isWaitingServer` clock pausing during LLM/TTS API requests and automatic `+20s` discussion extension (up to `180s`) when the human player speaks with `< 35s` left.
   - **Result**: Verified live via `/api/game/new` (`phaseTimerSec=45`) and `/api/game/:id/propose` (`phaseTimerSec=180`), syntax checked (`node --check`), pushed to GitHub, and redeployed to Google Cloud Run.
-- **[2026-10-16 13:37 KST] Task 15: 3-Zone Consolidated & Labeled Button Architecture**
-  - **Action**:
-    1. Eliminated duplicate/cryptic buttons across the Far-Left Rail, Left Sidebar, Top Stage Bar, and Bottom Dock in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
-    2. Consolidated all controls into 3 unambiguous zones with explicit text labels:
-       - **Zone 1 (Left Sidebar — `NEW GAME & ROLE SETUP`)**: Role selector (`#preferredRoleSelect`), primary **`🔄 Start New Game (Quest 1)`** button (`#startNewGamePrimaryBtn`), and 2 compact demo jump buttons (`⚡ Demo: Quest 4`, `🗡️ Demo: Assassin`).
-       - **Zone 2 (Top Context Action Bar — `#phaseActionBanner`)**: All in-game phase progression buttons (`Propose Team`, `⏭️ Next Idol Turn`, `🗳️ Start Vote`, `✅ Approve / ❌ Reject`, `✅ Success / 🗡️ Fail`, `🗡️ Resolve Assassin Shot`, `🔄 Play Again`).
-       - **Zone 3 (Bottom Call Controls Dock — `.call-controls-dock`)**: 5 labeled pill buttons (`Voice Mic`, `My Cam`, `Audio ON/OFF`, `X-Ray`, `Side Panel`).
-  - **Result**: Verified syntax (`node --check`), committed & pushed to GitHub, and redeployed to Google Cloud Run.

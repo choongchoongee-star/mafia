@@ -1404,6 +1404,50 @@ body {
   color: var(--text-faint);
 }
 
+.msg-replay-btn {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.msg-replay-btn:hover {
+  background: var(--discord-green);
+  border-color: var(--discord-green);
+  color: #fff;
+}
+
+.autoplay-unlock-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(35, 165, 90, 0.94);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+  animation: pulseUnlockBanner 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseUnlockBanner {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
 .msg-text {
   font-size: 13px;
   line-height: 1.42;
