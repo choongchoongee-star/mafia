@@ -302,7 +302,7 @@ export async function generateMcJaesukCommentary(game, eventType, contextData = 
   const board = getPublicBoardSummary(game);
   const activeQuest = getActiveQuest(game);
 
-  const prompt = `You are MC Jae-suk (유재석 style Korean National Variety Show Host) hosting "IDOL AVALON LIVE" on a Zoom call with 6 top K-Pop Girl Group idols (Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni) and our Special Guest (${getPlayerName(game, 'player_human')}).
+  const prompt = `You are MC Jae-ho (유재호 — Yoo Jae-suk style Korean National Variety Show Host) hosting "IDOL AVALON LIVE" on a Zoom call with 6 top K-Pop Girl Group idols (Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana) and our Special Guest (${getPlayerName(game, 'player_human')}).
 Speak 100% in energetic, witty, broadcast-ready English (you can drop a quick variety exclamation like "Yeorobun!", "Daebak!", or "Come on!").
 Keep it to 1-2 punchy sentences (20-38 words max) so the game pace stays lightning fast.
 
@@ -315,7 +315,7 @@ Current Game State:
 
 Return ONLY valid JSON:
 {
-  "text": "Your witty MC Jae-suk announcement in English",
+  "text": "Your witty MC Jae-ho announcement in English",
   "emotion": "speaking"
 }`;
 
@@ -345,17 +345,17 @@ Return ONLY valid JSON:
     speakerId: 'mc_jaesuk',
     text,
     emotion,
-    innerThought: `MC Showrunner orchestrating ${eventType} on Quest ${board.currentQuestNumber}.`,
+    innerThought: `MC Jae-ho Showrunner orchestrating ${eventType} on Quest ${board.currentQuestNumber}.`,
     modelUsed: llmResult.modelUsed,
     thinkingLevel: llmResult.thinkingLevel,
     verificationPassed: true,
-    verificationNote: '✅ Verified (MC Jae-suk Host): Broadcast state & Quest rule announcement verified.',
+    verificationNote: '✅ Verified (MC Jae-ho Host): Broadcast state & Quest rule announcement verified.',
     ...ttsPayload
   };
 }
 
 /**
- * High-energy variety show fallback lines for MC Jae-suk when running at zero latency.
+ * High-energy variety show fallback lines for MC Jae-ho when running at zero latency.
  */
 function buildFallbackMcLine(game, eventType, contextData) {
   const board = getPublicBoardSummary(game);
@@ -367,7 +367,7 @@ function buildFallbackMcLine(game, eventType, contextData) {
     if (game.demoPreset === 'ASSASSIN_CLIMAX') {
       return `Daebak! The Good team just cleared 3 Quests, which means it is time for the final ASSASSIN SHOT! Evil team, you have 30 seconds to unmask MERLIN and steal the game!`;
     }
-    return `Welcome to IDOL AVALON LIVE! Seven players—Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni, and our special guest ${humanName}—with secret roles randomly dealt! Leader ${board.leaderName}, pick ${board.requiredTeamSize} members for Quest 1 in 20 seconds!`;
+    return `Welcome to IDOL AVALON LIVE! Seven players—Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana, and our special guest ${humanName}—with secret roles randomly dealt! Leader ${board.leaderName}, pick ${board.requiredTeamSize} members for Quest 1 in 20 seconds!`;
   }
   if (eventType === 'TEAM_PROPOSED') {
     const teamStr = (contextData.proposedTeamNames || board.proposedTeamNames).join(', ');
@@ -402,8 +402,9 @@ export async function generateAiLeaderProposal(game) {
   const requiredSize = activeQuest.teamSize;
 
   const prompt = `You are playing a 7-player game of The Resistance: Avalon on a live K-Pop Variety Show Zoom call.
-YOUR IDENTITY & PERSONA:
-- Name: ${privateView.self.name} (${privateView.self.archetype})
+YOUR IDENTITY, NAMUWIKI PROFILE & PERSONA:
+- Name: ${privateView.self.name} (${privateView.self.koreanName || ''} — ${privateView.self.archetype})
+- Namuwiki Character Background (MBTI, Favorite Foods, Nicknames, Habits): ${JSON.stringify(privateView.self.namuwikiProfile || {})}
 - Personality: ${privateView.self.personality}
 - Speech Style: ${privateView.self.speechStyle}
 - Secret Role: ${privateView.self.roleName} (${privateView.self.alignment})
@@ -417,7 +418,7 @@ CURRENT BOARD STATE:
 - Recent Transcript: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
 
 TASK:
-Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a natural, convincing 1-2 sentence speech in English explaining why everyone should vote APPROVE on your team.
+Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a natural, convincing 1-2 sentence speech in English explaining why everyone should vote APPROVE on your team (feel free to sprinkle in your signature dialect or a quick reference to your Namuwiki favorite food/habit!).
 - If you are GOOD: pick the cleanest, least suspicious players (and if you are Merlin, avoid Evil players without sounding omniscient!).
 - If you are EVIL: include yourself or 1 Evil teammate blended with trusted Good players so the table approves your squad!
 
@@ -732,8 +733,9 @@ export async function generateDiscussionDebateTurn(
   }
 
   const prompt = `You are an autonomous AI agent playing a live 7-player game of The Resistance: Avalon on a K-Pop Variety Show Zoom call.
-YOUR DISTINCT CHARACTER, DIALECT & SECRET ROLE:
-- Name: ${winnerPrivateView.self.name} (${winnerPrivateView.self.archetype})
+YOUR DISTINCT CHARACTER, NAMUWIKI PROFILE, DIALECT & SECRET ROLE:
+- Name: ${winnerPrivateView.self.name} (${winnerPrivateView.self.koreanName || ''} — ${winnerPrivateView.self.archetype})
+- Namuwiki Character Background (Motif, MBTI, Favorite Foods, Nicknames, Habits): ${JSON.stringify(winnerPrivateView.self.namuwikiProfile || {})}
 - Signature Dialect / Vibe: ${winnerPrivateView.self.dialectTag}
 - Personality: ${winnerPrivateView.self.personality}
 - MANDATORY Speech & Dialect Style: ${winnerPrivateView.self.speechStyle}
@@ -765,11 +767,11 @@ ${
     ? `CRITICAL LIVE INPUT: Special Guest (${humanPlayer.name}) just said to the room: "${humanMessage}". Respond DIRECTLY and specifically to what ${humanPlayer.name} just said in your unmistakable dialect/persona (${winnerPrivateView.self.dialectTag}) while acting according to your secret role (${winnerPrivateView.self.roleName})!`
     : isBystanderSilent
       ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly in your signature dialect (${winnerPrivateView.self.dialectTag})—ask if they are hiding as Merlin or playing Oberon while commenting on [${proposedNames.join(', ')}]!`
-      : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your unmistakable dialect/persona (${winnerPrivateView.self.dialectTag}) and secret role strategy (${winnerPrivateView.self.roleName})!`
+      : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your unmistakable dialect/persona (${winnerPrivateView.self.dialectTag}), Namuwiki character quirks, and secret role strategy (${winnerPrivateView.self.roleName})!`
 }
 
 RULES FOR OUTPUT:
-- Speak in natural, punchy English infused with your character's signature regional dialect/slang (${winnerPrivateView.self.dialectTag}) — 1 to 2 sentences (22-42 words).
+- Speak in natural, punchy English infused with your character's signature regional dialect/slang (${winnerPrivateView.self.dialectTag}) and occasional fun references to your Namuwiki favorite foods/MBTI/nicknames — 1 to 2 sentences (22-42 words).
 - Never reveal forbidden role knowledge directly (if Merlin, disguise your knowledge as vote/behavior analysis!).
 - Return ONLY valid JSON:
 {
@@ -939,11 +941,11 @@ async function evaluateSingleIdolFloorBid(
       }
     }
 
-    // Persona-specific adjustments (Sullyoon holds silence until sniper shot; Chaewon & Karina jump in aggressively)
+    // Persona-specific adjustments (Seol-ah holds silence until sniper shot; Chaerin & Rina jump in aggressively)
     if (idol.id === 'idol_sullyoon' && urgency < 78 && timesSpokenThisRound >= 1) {
       urgency = 26;
       intent = 'HOLD_SILENT';
-      strategicSilenceThought = `As ${role.roleName} (Sullyoon), holding quiet deer-eyed silence until someone contradicts the vote math, then I'll snipe them in Busan Satoori.`;
+      strategicSilenceThought = `As ${role.roleName} (Seol-ah, ISFP Homebody Observer), holding quiet deer-eyed silence until someone contradicts the vote math, then I'll snipe them in Busan Satoori.`;
     } else if (
       (idol.id === 'idol_chaewon' || idol.id === 'idol_karina') &&
       timesSpokenThisRound === 0
@@ -982,15 +984,15 @@ function buildDialectMicYieldLine(yielderIdol, winnerIdol, intendedText) {
   const snippet = intendedText.split(/[,.!?]/)[0]?.slice(0, 28) || 'Wait, look at the team';
   switch (yielderIdol.id) {
     case 'idol_sullyoon':
-      return `Aigoo, ma! ${snippet}— oh! 미안 (Sorry) ${winnerIdol.name} unnie, we turned on our mics at the exact same time! Go ahead first, I'll drop my Busan bomb right after you~`;
+      return `Aigoo, ma! ${snippet}— oh! 미안 (Sorry) ${winnerIdol.name} unnie, we turned on our mics at the exact same time! Go ahead first, Seol-ah will drop her Busan bomb right after you~`;
     case 'idol_wonyoung':
-      return `Excuse me, I was just going to say— oh my~✨ ${winnerIdol.name} unnie, you look so urgent right now! Ladies first, go ahead and speak before Wonyoung~`;
+      return `Excuse me, I was just going to say— oh my~✨ ${winnerIdol.name} unnie, you look so urgent right now! Ladies first, go ahead and speak before Seoyoung~`;
     case 'idol_yuna':
       return `Hold on, ${snippet}— aigoo, geu-ryeo (그려)~ ${winnerIdol.name} unnie jumped right in too! Go right ahead unnie, let's hear your big theory first~`;
     case 'idol_hanni':
-      return `Oi wait, ${snippet}— oh crikey, ${winnerIdol.name} and I just clashed on the mic! No worries mate, you go first and I'll jump in after!`;
+      return `Oi wait, ${snippet}— oh crikey, ${winnerIdol.name} and I just clashed on the mic! No worries mate, you go first and Hana will jump in after!`;
     case 'idol_karina':
-      return `Wait, check the— hold on, ${winnerIdol.name} and I unmuted together. Make your point fast, ${winnerIdol.name}, then I'm breaking down the vote math.`;
+      return `Wait, check the— hold on, ${winnerIdol.name} and I unmuted together. Make your point fast, ${winnerIdol.name}, then Rina is breaking down the vote math.`;
     case 'idol_chaewon':
     default:
       return `Yo, hold up— ah, ${winnerIdol.name}, we both grabbed the mic at once! Say your piece in 5 seconds, go ahead!`;
@@ -1019,29 +1021,29 @@ function prependCollisionHandoffPhrase(winnerIdol, yielderName, baseText) {
 }
 
 /**
- * Infuses an idol's signature regional dialect, slang, and speech mannerisms into her spoken dialogue.
+ * Infuses an idol's signature regional dialect, Namuwiki trivia (favorite foods/MBTI/habits), and speech mannerisms into her spoken dialogue.
  */
 function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'unnie') {
   switch (speakerId) {
     case 'idol_sullyoon':
-      // Busan / Gyeongsang-do Satoori Sniper
-      return `Aigoo, ma! Mwo-ra-ka-no (뭐라카노)? ${coreSentence} Ddaeng—that logic is jin-jja (진짜) shady right now!`;
+      // Seol-ah: Busan Satoori Sniper + ISFP Malatang/Bread lover
+      return `Aigoo, ma! Mwo-ra-ka-no (뭐라카노)? ${coreSentence} Ddaeng (땡)—I'd bet my favorite salt bread and level-2.5 malatang that logic is jin-jja shady!`;
     case 'idol_yuna':
-      // Chungcheong-do Roundabout Sarcasm ("돌려까기")
-      return `Oh sure~ geu-ryeo (그려)~ ${coreSentence} Real nice job helping Mordred out, totally not suspicious at all~`;
+      // Yura: Chungcheong Sarcasm + ENFP Floorball Ace / Pizza & Gukbap lover
+      return `Oh sure~ geu-ryeo (그려)~ ${coreSentence} Real nice job helping Mordred out, my ENFP floorball-ace instinct smells a trap from a mile away~`;
     case 'idol_hanni':
-      // Melbourne Aussie Slang Trap-Setter
-      return `Oi mate, fair dinkum—${coreSentence} No worries though, I reckon ${targetName} just walked right into my trap!`;
+      // Hana: Melbourne Aussie Slang + INFP Baguette/Mint-Choco lover
+      return `Oi mate, fair dinkum—${coreSentence} No worries though, I reckon ${targetName} just walked right into Hana's Melbourne logic trap!`;
     case 'idol_wonyoung':
-      // Posh "Lucky Vicky" Princess
-      return `Excuse me, everyone~✨ ${coreSentence} Honestly, catching this now is so Lucky Vicky for us, don't you think~?`;
+      // Seoyoung: Posh "Lucky Seoyoung" Princess + ISTP Strawberry/Hanwoo lover
+      return `Excuse me, everyone~✨ ${coreSentence} Honestly, catching this now is so Lucky Seoyoung for us—I swear on my favorite fresh strawberries!`;
     case 'idol_chaewon':
-      // Fierce Street-Boss Leader
-      return `Yo, cut the act right now! ${coreSentence} Explain yourself in 5 seconds or I'm smashing Reject, period!`;
+      // Chaerin: Fierce Street-Boss + ISTP Ssam-Chaerin "Dodok-nom!" meme
+      return `Yo, cut the act right now, dodok-nom (도독놈)! ${coreSentence} Explain yourself to Ssam-Chaerin in 5 seconds or I'm smashing Reject, period!`;
     case 'idol_karina':
     default:
-      // Ice-Cold Prosecutor Math
-      return `Stop deflecting and look at the exact vote matrix. ${coreSentence} Mathematically, that's a massive red flag.`;
+      // Rina: Ice-Cold Prosecutor Math + ENFP Tonkatsu/Mint-Choco gamer
+      return `Stop deflecting and look at the exact vote matrix. ${coreSentence} Mathematically, I'd bet my favorite tonkatsu and mint-choco that's a massive red flag.`;
   }
 }
 
@@ -1216,7 +1218,7 @@ function buildContextualDebateFallback(
 
 /**
  * Executes simultaneous parallel voting across all 6 AI Idols (`gemini-3.8-flash` / `gemini-4-argon`).
- * Combines with the Human Player's vote (or automatic fallback if the 15s timer expired).
+ * Combines with the Human Player's vote (or automatic fallback if the 30s timer expired).
  *
  * @param {object} game
  * @param {'APPROVE'|'REJECT'|null} humanVote
@@ -1228,7 +1230,7 @@ export async function generateParallelTeamVotes(game, humanVote = null) {
   const proposedIds = game.proposedTeamIds;
   const allVotes = {};
 
-  // 1. Record Human Player vote (or auto-fallback if 15s timer expired)
+  // 1. Record Human Player vote (or auto-fallback if 30s timer expired)
   const humanRole = game.roleAssignments.player_human;
   const finalHumanVote =
     humanVote === 'APPROVE' || humanVote === 'REJECT'
@@ -1242,7 +1244,7 @@ export async function generateParallelTeamVotes(game, humanVote = null) {
     reason:
       humanVote
         ? `Guest voted ${finalHumanVote} live.`
-        : `Auto-voted ${finalHumanVote} as 15s Vote Timer expired.`,
+        : `Auto-voted ${finalHumanVote} as 30s Vote Timer expired.`,
     innerThought: `Human player (${humanRole.roleName}) cast ${finalHumanVote}.`
   };
 

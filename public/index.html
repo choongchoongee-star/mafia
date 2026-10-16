@@ -7,11 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=clear-controls-1" />
+  <link rel="stylesheet" href="/styles.css?v=20261016-timers-180s" />
 </head>
 <body>
   <div class="discord-app" id="discordApp">
-    <!-- Far-Left Discord Server Icon Rail -->
+    <!-- Far-Left Discord Server Icon Rail (Sticky Top Nav on Mobile) -->
     <nav class="server-rail" aria-label="Servers">
       <div class="server-icon active" title="Idol Avalon Studio">
         <span class="server-pill"></span>
@@ -30,6 +30,23 @@
       >
         <span class="rail-text-badge">ARCH</span>
       </a>
+
+      <!-- Mobile Quick-Jump Navigation Bar (Visible on Mobile/Tablet <= 960px) -->
+      <div class="mobile-quick-nav" aria-label="Mobile Quick Navigation">
+        <button type="button" class="mobile-nav-pill active" data-mobile-jump="mainVideoStage">
+          🎥 Stage
+        </button>
+        <button type="button" class="mobile-nav-pill" data-mobile-jump="rightChatDrawer" data-mobile-tab="transcriptTab">
+          💬 Chat
+        </button>
+        <button type="button" class="mobile-nav-pill" data-mobile-jump="rightChatDrawer" data-mobile-tab="xrayTab">
+          🔍 X-Ray
+        </button>
+        <button type="button" class="mobile-nav-pill" data-mobile-jump="leftChannelSidebar">
+          🎲 Role / Setup
+        </button>
+      </div>
+
       <div class="rail-spacer"></div>
       <button id="apiKeyModalBtn" class="server-icon util-icon" title="Gemini API Key &amp; Studio Settings">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -40,7 +57,7 @@
     </nav>
 
     <!-- Left Discord Channel & Game State Sidebar -->
-    <aside class="channel-sidebar">
+    <aside class="channel-sidebar" id="leftChannelSidebar">
       <header class="server-header">
         <div class="server-name-wrap">
           <span class="server-verified" title="Verified Gemini 4 Argon Server">
@@ -162,7 +179,7 @@
     </aside>
 
     <!-- Center Discord Video Call Stage -->
-    <main class="video-call-stage">
+    <main class="video-call-stage" id="mainVideoStage">
       <!-- Top Floating Meeting Pill + Context Action Bar -->
       <div class="stage-top-bar">
         <div class="meeting-info-pill" id="phaseClockCard">
@@ -304,6 +321,14 @@
 
           <div class="xray-block">
             <div class="xray-block-header">
+              <span>Idol Cast Lore (나무위키 프로필)</span>
+              <span class="xray-tag">6 K-Pop Idols</span>
+            </div>
+            <div id="namuwikiCastContainer" class="xray-list"></div>
+          </div>
+
+          <div class="xray-block">
+            <div class="xray-block-header">
               <span>Verification Guard Loop</span>
               <span class="xray-tag">gemini-4-argon</span>
             </div>
@@ -338,6 +363,6 @@
     </div>
   </div>
 
-  <script type="module" src="/app.js?v=clear-controls-1"></script>
+  <script type="module" src="/app.js?v=20261016-timers-180s"></script>
 </body>
 </html>
