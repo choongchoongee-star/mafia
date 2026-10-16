@@ -140,3 +140,29 @@
 3. **Multimodal references & `DESIGN.md`**: Extract typography, color palette, and layout rules into `DESIGN.md` and use multimodal assets.
 4. **Orchestrate Argon with Flash & media subagents**: Use `gemini-4-argon` as Lead Architect / Game Master, delegating fast parallel subtasks to `gemini-3.8-flash` and media generation to `gemini-nano-banana-2.1`, `gemini-3.8-live`, `gemini-3.8-flash-tts`, and `lyria-3.5`.
 5. **Capture codebase quirks & visual explainers**: Document lessons in `AGENTS.md` and generate an interactive HTML architecture diagram / pipeline walkthrough for the judges.
+
+---
+
+## 7. Hackathon Account (`@gcplab.me`) & GCP Environment Guide (Tab 2: `t.yemjng8rofdc`)
+
+### 1. Logging In (`@gcplab.me`)
+- Log into [Google Cloud Console](https://console.cloud.google.com) in a **new Chrome profile or Incognito window** using the provided `@gcplab.me` ID and password.
+- Select the **single pre-assigned GCP project** (Billing is already enabled).
+
+### 2. Getting Your Gemini API Key in Google AI Studio
+- Log into [Google AI Studio (`aistudio.google.com`)](https://aistudio.google.com) with the same `@gcplab.me` account.
+- Navigate to **Get API key**.
+- If no key appears yet, click **Import Projects**, select your assigned GCP project, and an already-provisioned API key (or instant key creation) will appear.
+
+### 3. Antigravity Login (`Agent Platform Business Plan`)
+- You can log into Antigravity 2.0 / IDE / CLI (`agy`) using the `@gcplab.me` account.
+- **Important**: Specify your **GCP Project ID** when logging into Antigravity to get the **Agent Platform (Business) Plan**. If it says "Starter Quota", log out and log back in with the Project ID specified.
+
+### 4. Recommended GCP Services & Strict Security Rules
+- **App Hosting**: **Cloud Run** (recommended for web apps), **Firebase**, or **GKE Autopilot**.
+- **Databases / Storage**: Cloud SQL, AlloyDB, Cloud Storage, BigQuery.
+- **Strict Prohibitions & Warnings (`⚠️`)**:
+  - **Immediate Decommissioning**: All `@gcplab.me` accounts, GCP projects, and documents will be **permanently deleted immediately after the event**. Back up all code/artifacts to personal PC and **public GitHub** before 15:20 KST.
+  - **No OpenClaw**: Using autonomous agents like **OpenClaw** inside the project is strictly prohibited.
+  - **Security Enforcement**: Unsecured HTTP ports, databases wide open to the public internet, PHP usage, or **leaked API keys** are automatically detected and can cause immediate project suspension.
+

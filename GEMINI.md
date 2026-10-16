@@ -34,6 +34,9 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 12:30 KST] Task 6: Live Verification of All 4 Google Doc Tabs**
+  - **Action**: Re-fetched all 4 live tabs (`t.buqd8v5hdzxz`, `t.yemjng8rofdc`, `t.reg13nqd61w`, `t.wdm4t18j5jqx`) directly from the official Google Doc (`13hG3aETJ54oKULF3JZUgM5VYHv7o2ZM4a4AZeqinbRg`) to check for real-time updates (such as the submission link status and `@gcplab.me` account rules) and added the full Tab 2 (`@gcplab.me` & GCP guide) section to [docs/hackathon-guide.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/hackathon-guide.md).
+  - **Result**: All 4 sections verified and documented; older log entry archived to [logs/log-2026-10.md](file:///c:/Users/Charlie/Business/Projects/mafia/logs/log-2026-10.md).
 - **[2026-10-16 12:19 KST] Task 5: `.env` File Creation & Hot-Reload Support**
   - **Action**: Created local [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (excluded from git via [.gitignore](file:///c:/Users/Charlie/Business/Projects/mafia/.gitignore)) and updated [`hasGeminiApiKey`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L53-L68) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) to automatically hot-reload `GEMINI_API_KEY` from `.env` on disk without requiring a server restart.
   - **Result**: Ready for user to paste `GEMINI_API_KEY` into [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env).
@@ -55,7 +58,4 @@
     4. **Multimodal & Verification Pipeline**: `gemini-4-argon` (orchestration, deduction, verification loop), `gemini-3.8-flash` (parallel voting/debate), `gemini-nano-banana-2.1` (photorealistic idol/MC portraits), `gemini-omni-1.1-flash` (live background video clips), `gemini-3.8-flash-tts` (expressive English speech), `lyria-3.5` (adaptive BGM).
   - **Artifacts Created**: [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md), [docs/spec-api.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-api.md).
   - **Result**: Ready to initialize Node.js/Express + `@google/genai` backend and Zoom Broadcast Studio frontend.
-- **[2026-10-16 11:23 KST] Task 1: Hackathon Rules & Objectives Organization**
-  - **Action**: Parsed all 4 tabs of the official Google DeepMind AI Hackathon guide (Event logistics, Builder Guide, Interactions API specifications, Model IDs, Judging Criteria, Disqualification triggers, and Problem Statements for Tracks 1–4).
-  - **Artifacts Created**: Created [docs/hackathon-guide.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/hackathon-guide.md) and initialized [GEMINI.md](file:///c:/Users/Charlie/Business/Projects/mafia/GEMINI.md).
-  - **Result**: Complete ruleset and technical constraints organized and persisted. Ready to align on the exact `mafia` project concept and architecture.
+
