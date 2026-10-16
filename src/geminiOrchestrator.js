@@ -121,7 +121,7 @@ export async function callArgonInteraction({
       }
 
       const timeoutMs =
-        thinkingLevel === 'high' ? 6500 : thinkingLevel === 'low' ? 1800 : 3500;
+        thinkingLevel === 'high' ? 3800 : thinkingLevel === 'low' ? 1200 : 1700;
       const interaction = await Promise.race([
         client.interactions.create(requestPayload),
         new Promise((_, reject) =>
@@ -146,8 +146,8 @@ export async function callArgonInteraction({
     // Fall through to fast companion model adapter if real-time broadcast turn exceeds latency budget
   }
 
-  // 2. Secondary path: Fast companion models (`gemini-2.5-flash` / `gemini-3.5-flash-lite` / `gemini-3.8-flash`) for sub-2s real-time pacing
-  const candidateModels = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  // 2. Secondary path: Fast companion models (`gemini-3.8-flash` / `gemini-3.5-flash-lite` / `gemini-2.5-flash`) for sub-1.5s real-time pacing
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
 
   for (const candidateModel of candidateModels) {
     try {
@@ -155,11 +155,16 @@ export async function callArgonInteraction({
       if (candidateModel === 'gemini-4-argon') {
         config.thinkingConfig = { thinkingLevel };
       }
-      const response = await client.models.generateContent({
-        model: candidateModel,
-        contents: prompt,
-        config
-      });
+      const response = await Promise.race([
+        client.models.generateContent({
+          model: candidateModel,
+          contents: prompt,
+          config
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Companion model latency guard')), 2200)
+        )
+      ]);
       const text = response?.text || '';
       if (text) {
         return {
@@ -238,6 +243,20 @@ export async function verifyAndHealUtterance(game, speakerId, draftResponse) {
       .trim();
   }
 
+  // Strip off-topic food/snack clauses if any model ever drifts away from Avalon gameplay
+  const foodPattern =
+    /\b(tteokbokki|strawberr(?:y|ies)|tonkatsu|mint-?choco|malatang|salt bread|gukbap|cheeseburger|avocado toast|spring rolls|naengmyeon|ramyeon|hanwoo|pistachio ice cream|kimchi stew)\b/i;
+  if (foodPattern.test(text)) {
+    issues.push('Off-topic food reference stripped to keep dialogue 100% focused on Avalon progression');
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .filter((s) => !foodPattern.test(s));
+    text =
+      sentences.length > 0
+        ? sentences.join(' ').trim()
+        : `Looking at Quest ${activeQuest.questNumber} (${activeQuest.teamSize} players), we need to verify every slot on this roster before locking our votes.`;
+  }
+
   // Check 1: Prevent explicit forbidden role leaks
   if (role) {
     if (role.roleId === 'MERLIN' && /\b(i am merlin|i'm merlin|as merlin i saw)\b/i.test(text)) {
@@ -275,6 +294,20 @@ export async function verifyAndHealUtterance(game, speakerId, draftResponse) {
     text = text.replace(/\bone fail is enough\b/gi, 'Quest 4 requires two Fails to fail');
   }
 
+  // Check 3: Prevent 3-person roster hallucinations during 2-player Quest 1
+  if (activeQuest.teamSize === 2) {
+    if (/\byou,\s*([A-Za-z-]+),?\s+and\s+(myself|me)\b/i.test(text)) {
+      issues.push('Quest 1 (2-player limit) roster count healed from 3 names to 2');
+      text = text.replace(/\byou,\s*([A-Za-z-]+),?\s+and\s+(myself|me)\b/gi, '$1 and $2');
+    }
+    if (/\b(all three of us|three of us|3-player|three-player)\b/i.test(text)) {
+      issues.push('Quest 1 (2-player limit) phrasing healed to 2 players');
+      text = text
+        .replace(/\b(all three of us|three of us)\b/gi, 'both of us')
+        .replace(/\b(3-player|three-player)\b/gi, '2-player');
+    }
+  }
+
   const verificationPassed = issues.length === 0;
   const verificationNote = verificationPassed
     ? `✅ Verified (${speakerName} [${role?.roleName || 'Host'}]): Epistemic isolation, Quest ${activeQuest.questNumber} (${activeQuest.teamSize}p) rules & English check passed.`
@@ -310,9 +343,9 @@ export async function generateMcJaesukCommentary(game, eventType, contextData = 
   const board = getPublicBoardSummary(game);
   const activeQuest = getActiveQuest(game);
 
-  const prompt = `You are MC Jae-ho (유재호 — Yoo Jae-suk style Korean National Variety Show Host) hosting "IDOL AVALON LIVE" on a Zoom call with 6 top K-Pop Girl Group idols (Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana) and our Special Guest (${getPlayerName(game, 'player_human')}).
+  const prompt = `You are MC Jae-ho (Yoo Jae-suk style Korean National Variety Show Host) hosting "IDOL AVALON LIVE" on a Zoom call with 6 top K-Pop Girl Group idols (Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana) and our Special Guest (${getPlayerName(game, 'player_human')}).
 Speak 100% in energetic, witty, broadcast-ready English (you can drop a quick variety exclamation like "Yeorobun!", "Daebak!", or "Come on!").
-Keep it to 1-2 punchy sentences (20-38 words max) so the game pace stays lightning fast.
+Keep it to ONE crisp, fast sentence (14-24 words max) with NO square brackets or slashes so TTS voice synthesis flows smoothly without pausing.
 
 Current Game State:
 - Event: ${eventType}
@@ -323,7 +356,7 @@ Current Game State:
 
 Return ONLY valid JSON:
 {
-  "text": "Your witty MC Jae-ho announcement in English",
+  "text": "Your witty 1-sentence MC Jae-ho announcement in English (14-24 words)",
   "emotion": "speaking"
 }`;
 
@@ -397,6 +430,86 @@ function buildFallbackMcLine(game, eventType, contextData) {
 }
 
 /**
+ * Builds an exact, round-accurate summary of actionable Avalon board facts so LLM prompts and fallbacks
+ * never hallucinate past votes on Quest 1 Round 1 and always drive the current phase forward.
+ */
+function buildActionableBoardFacts(
+  game,
+  privateView,
+  effectiveTeamIds = [],
+  isPreProposalPhase = false
+) {
+  const activeQuest = getActiveQuest(game);
+  const hasVoteHistory = Array.isArray(game.voteHistory) && game.voteHistory.length > 0;
+  const hasQuestHistory = Array.isArray(game.questHistory) && game.questHistory.length > 0;
+  const leaderName = getPlayerName(game, game.leaderId);
+  const proposedIds =
+    effectiveTeamIds && effectiveTeamIds.length > 0 ? effectiveTeamIds : game.proposedTeamIds || [];
+  const proposedNames = proposedIds.map((id) => getPlayerName(game, id));
+
+  const lines = [];
+  if (!hasVoteHistory && !hasQuestHistory) {
+    lines.push(
+      `- ROUND-1 OPENING FACT: This is Quest 1, Proposal 1/5 (Opening Round). ZERO prior team votes and ZERO prior Quests have happened yet. Do NOT mention "earlier vote patterns" or "last round's vote ledger". Focus on who should be on the 2-player opening scout team and whether to APPROVE for round-1 baseline information or REJECT.`
+    );
+  } else {
+    if (hasQuestHistory) {
+      const questSummaries = game.questHistory.map(
+        (q) =>
+          `Quest ${q.questNumber} (${q.teamIds.map((id) => getPlayerName(game, id)).join(', ')}) -> ${q.outcome} (${q.failCount} Fail)`
+      );
+      lines.push(`- COMPLETED QUEST LEDGER: ${questSummaries.join(' | ')}`);
+    }
+    if (hasVoteHistory) {
+      const lastVote = game.voteHistory[game.voteHistory.length - 1];
+      const approvers = Object.entries(lastVote.votes || {})
+        .filter(([, v]) => v.vote === 'APPROVE')
+        .map(([id]) => getPlayerName(game, id));
+      const rejecters = Object.entries(lastVote.votes || {})
+        .filter(([, v]) => v.vote === 'REJECT')
+        .map(([id]) => getPlayerName(game, id));
+      lines.push(
+        `- LAST TEAM VOTE (Q${lastVote.questNumber} Prop #${lastVote.proposalAttempt} on [${lastVote.proposedTeamIds.map((id) => getPlayerName(game, id)).join(', ')}]): APPROVED by [${approvers.join(', ')}] vs REJECTED by [${rejecters.join(', ')}].`
+      );
+    }
+  }
+
+  if (game.rejectTrack >= 3) {
+    lines.push(
+      `- HAMMER ALERT: Reject Track is at ${game.rejectTrack}/5! ${
+        game.rejectTrack === 4
+          ? 'This is the 5th and FINAL Hammer proposal—if rejected, EVIL WINS IMMEDIATELY! Good players MUST strongly consider voting APPROVE unless Evil is guaranteed to win the 3rd Quest.'
+          : 'Only 1 more rejection before the forced Hammer proposal!'
+      }`
+    );
+  } else {
+    lines.push(
+      `- REJECT TRACK STATUS: Proposal ${game.rejectTrack + 1} of 5 (${4 - game.rejectTrack} rejection(s) left before Hammer).`
+    );
+  }
+
+  if (activeQuest.questNumber === 4) {
+    lines.push(
+      `- QUEST 4 TWO-FAIL RULE: Quest 4 requires 4 players and TWO Fail cards for Evil to sabotage it (1 Fail still SUCCEEDS).`
+    );
+  }
+
+  const cleanPick =
+    privateView.suspicionRanking[privateView.suspicionRanking.length - 1]?.playerName ||
+    privateView.self.name;
+  const topSuspect = privateView.suspicionRanking[0]?.playerName || leaderName;
+  lines.push(
+    `- YOUR ACTIONABLE READS: Your most trusted external player is ${cleanPick}; your #1 Evil suspect is ${topSuspect}. ${
+      isPreProposalPhase
+        ? `Lobby Leader ${leaderName} on which exact ${activeQuest.teamSize} players to pick (e.g., include yourself/${cleanPick}, exclude ${topSuspect}).`
+        : `State clearly whether you will vote APPROVE or REJECT on [${proposedNames.join(', ')}], or name the exact swap (${topSuspect} -> yourself/${cleanPick}) required to earn your APPROVE vote.`
+    }`
+  );
+
+  return lines.join('\n');
+}
+
+/**
  * Uses `gemini-4-argon` (`thinking_level: "high"`) to have an AI Idol Leader select the optimal
  * N-player Quest Team based on her isolated Night-Phase knowledge and Bayesian suspicion matrix,
  * and deliver her live justification speech.
@@ -408,34 +521,35 @@ export async function generateAiLeaderProposal(game) {
   const privateView = buildPrivatePlayerView(game, leaderId);
   const activeQuest = getActiveQuest(game);
   const requiredSize = activeQuest.teamSize;
+  const actionableBoardFacts = buildActionableBoardFacts(game, privateView, [], true);
 
   const prompt = `You are playing a 7-player game of The Resistance: Avalon on a live K-Pop Variety Show Discord call.
-YOUR IDENTITY & PERSONA:
+YOUR IDENTITY & SECRET ROLE:
 - Name: ${privateView.self.name} (${privateView.self.koreanName || ''} — ${privateView.self.archetype})
-- Character Background: ${JSON.stringify(privateView.self.namuwikiProfile || {})}
-- Personality: ${privateView.self.personality}
+- Deduction Playstyle: ${privateView.self.namuwikiProfile?.playstyle || privateView.self.archetype}
 - Conversational Tone: ${privateView.self.speechStyle}
 - Secret Role: ${privateView.self.roleName} (${privateView.self.alignment})
 - ${privateView.epistemicVision.nightVisionText}
 
-CURRENT BOARD STATE:
+CURRENT BOARD STATE & ACTIONABLE FACTS:
 - You are the Leader for Quest ${activeQuest.questNumber} (Requires EXACTLY ${requiredSize} players; ${activeQuest.failsRequired} Fail(s) needed to fail).
 - Score: Good ${privateView.boardSummary.goodScore} vs Evil ${privateView.boardSummary.evilScore} | Reject Track: ${privateView.boardSummary.rejectTrack}/5
+${actionableBoardFacts}
 - Your Bayesian Evil Suspicion Ranking (Higher = More Suspicious): ${JSON.stringify(privateView.suspicionRanking)}
-- Past Quest History: ${JSON.stringify(privateView.boardSummary.questHistory)}
 - Recent Transcript: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
 
-TASK:
-Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a natural, convincing 1-2 sentence speech in English explaining why everyone should vote APPROVE on your team.
-- If you are GOOD: pick the cleanest, least suspicious players (and if you are Merlin, avoid Evil players without sounding omniscient!).
-- If you are EVIL: include yourself or 1 Evil teammate blended with trusted Good players so the table approves your squad!
-- STRICT DIALOGUE RULE: Never use the word "Aigoo" or "Aigo", do NOT force food bets or repetitive catchphrases, and vary your opening phrasing naturally.
+TASK (MANDATORY AVALON PROGRESSION):
+Select EXACTLY ${requiredSize} player IDs (including yourself "${leaderId}" if strategic) for Quest ${activeQuest.questNumber}, and give a concise 1-sentence speech in English (15-26 words) that:
+1. Explicitly names your ${requiredSize}-player Quest ${activeQuest.questNumber} lineup in natural speech (NO square brackets or em-dashes),
+2. Gives a round-accurate Avalon reason (if Quest 1 Proposal 1: opening 2-player scout test; if later rounds: keeping clean Quest winners or excluding failed-Quest suspects),
+3. Calls on the table to lock in an APPROVE vote.
+- STRICT RULE: Never mention food, snacks, or off-topic hobbies, and never use "Aigoo". 100% of your speech must drive the Avalon game forward.
 
 Return ONLY valid JSON:
 {
   "proposedTeamIds": ["${leaderId}", ...],
   "innerThought": "Your secret strategic reasoning as ${privateView.self.roleName}",
-  "text": "Your spoken English announcement to the call (20-38 words)",
+  "text": "Your spoken English announcement to the call (15-26 words, no brackets)",
   "emotion": "speaking"
 }`;
 
@@ -542,9 +656,12 @@ function buildLeaderInnerThought(privateView, teamNames, activeQuest) {
 function buildDynamicLeaderProposalSpeech(game, privateView, candidateIds, teamNames, activeQuest) {
   const others = teamNames.filter((n) => n !== privateView.self.name);
   const lastFailedQuest = [...game.questHistory].reverse().find((q) => q.outcome === 'FAIL');
+  const hasHistory = game.voteHistory.length > 0 || game.questHistory.length > 0;
   const coreText = lastFailedQuest
-    ? `Quest ${lastFailedQuest.questNumber} failed earlier, so for Quest ${activeQuest.questNumber} I'm taking ${others.join(' and ')} with me because the vote math clears this squad!`
-    : `For Quest ${activeQuest.questNumber}, I'm proposing myself with ${others.join(' and ')}—let's watch closely how everyone votes on this lineup!`;
+    ? `Quest ${lastFailedQuest.questNumber} failed earlier, so for Quest ${activeQuest.questNumber} I'm proposing [${teamNames.join(', ')}] to cut out the failed-Quest risk—everyone vote APPROVE!`
+    : hasHistory
+      ? `Based on our last vote split, I'm locking in [${teamNames.join(', ')}] for Quest ${activeQuest.questNumber}—let's vote APPROVE and secure this point!`
+      : `For our opening 2-player Quest 1 scout team, I'm proposing myself with ${others.join(' and ')}—vote APPROVE so we get clean Round 1 information!`;
   return stylizeWithIdolDialect(privateView.self.id, coreText, others[0] || 'everyone');
 }
 
@@ -596,8 +713,25 @@ export async function generateDiscussionDebateTurn(
 
   const lastTranscriptItem =
     game.transcript.length > 0 ? game.transcript[game.transcript.length - 1] : null;
-  const lastSpeakerId = lastTranscriptItem ? lastTranscriptItem.speakerId : null;
-  const lastTargetId = lastTranscriptItem ? lastTranscriptItem.targetPlayerId : null;
+  const lastAiTurn =
+    [...game.transcript]
+      .reverse()
+      .find((t) => t.speakerId && t.speakerId !== 'player_human' && t.speakerId !== 'mc_jaesuk') ||
+    null;
+  const lastSpeakerId = lastAiTurn ? lastAiTurn.speakerId : null;
+  const lastTargetId =
+    lastTranscriptItem && lastTranscriptItem.targetPlayerId
+      ? lastTranscriptItem.targetPlayerId
+      : lastAiTurn
+        ? lastAiTurn.targetPlayerId
+        : null;
+
+  // Compute minimum times spoken this round among candidate idols so everyone gets a fair, orderly turn before anyone repeats
+  const minTimesSpoken = Math.min(
+    ...biddingIdols.map(
+      (idol) => game.speakerHistoryThisRound.filter((id) => id === idol.id).length
+    )
+  );
 
   // Step 1: Parallel 6-Agent Autonomous Floor Evaluation (each idol evaluates from her own isolated epistemic state)
   const rawAgentBids = await Promise.all(
@@ -608,73 +742,32 @@ export async function generateDiscussionDebateTurn(
         isBystanderSilent,
         lastSpeakerId,
         lastTargetId,
+        lastAiTurn,
         effectiveTeamIds,
-        isPreProposalPhase
+        isPreProposalPhase,
+        minTimesSpoken
       })
     )
   );
 
   // Sort bids descending by urgency
   const sortedBids = [...rawAgentBids].sort((a, b) => b.urgency - a.urgency);
-  const primaryBid = sortedBids[0];
-  const secondaryBid = sortedBids[1];
+  const winnerBid = sortedBids[0];
+  const yielderBid = null;
 
-  // Detect Simultaneous Mic Collision & Polite Yield (`COLLISION_YIELD`)
-  // Happens occasionally when 2 agents both have very high urgency (>= 84 and >= 78)
-  const hadRecentCollision = game.lastFloorEvent?.type === 'COLLISION_YIELD';
-  const isMicCollision =
-    !humanMessage &&
-    !hadRecentCollision &&
-    game.transcript.length % 3 === 1 &&
-    primaryBid &&
-    secondaryBid &&
-    primaryBid.urgency >= 84 &&
-    secondaryBid.urgency >= 78;
-
-  let winnerBid = primaryBid;
-  let yielderBid = null;
-  let floorEvent = null;
-
-  if (isMicCollision) {
-    // If primaryBid is polite yielder and secondaryBid is a push-through speaker, primary starts and yields to secondary!
-    // Otherwise secondary starts speaking and yields to primary.
-    if (
-      primaryBid.yieldStyle === 'YIELD_POLITELY' &&
-      secondaryBid.yieldStyle === 'PUSH_THROUGH'
-    ) {
-      yielderBid = primaryBid;
-      winnerBid = secondaryBid;
-    } else {
-      yielderBid = secondaryBid;
-      winnerBid = primaryBid;
-    }
-
-    floorEvent = {
-      type: 'COLLISION_YIELD',
-      summary: `⚡ Mic Clash! ${yielderBid.speakerName} & ${winnerBid.speakerName} unmuted at the same time — ${yielderBid.speakerName} yielded the floor to ${winnerBid.speakerName}!`,
-      clashingSpeakerIds: [yielderBid.speakerId, winnerBid.speakerId],
-      yielderId: yielderBid.speakerId,
-      yielderName: yielderBid.speakerName,
-      winnerId: winnerBid.speakerId,
-      winnerName: winnerBid.speakerName,
-      timestamp: new Date().toISOString()
-    };
-  } else {
-    const silentAgents = sortedBids.filter((b) => b.intent === 'HOLD_SILENT');
-    floorEvent = {
-      type: winnerBid.intent === 'INTERRUPT' ? 'URGENT_INTERRUPT' : 'STRATEGIC_FLOOR',
-      summary:
-        winnerBid.intent === 'INTERRUPT'
-          ? `🔥 ${winnerBid.speakerName} (${winnerBid.dialectTag}) jumped in with urgency ${winnerBid.urgency}/100! (${silentAgents.length} idols holding strategic silence)`
-          : `🎙️ ${winnerBid.speakerName} (${winnerBid.dialectTag}) took the mic (${silentAgents.length} idols holding strategic silence).`,
-      clashingSpeakerIds: [winnerBid.speakerId],
-      yielderId: null,
-      winnerId: winnerBid.speakerId,
-      winnerName: winnerBid.speakerName,
-      silentAgentIds: silentAgents.map((s) => s.speakerId),
-      timestamp: new Date().toISOString()
-    };
-  }
+  // Strict Orderly Turn-Taking: Mic Collisions (COLLISION_YIELD) and interruptions are disabled
+  // so every speaker finishes their full line without being cut off or restarting from the beginning.
+  const silentAgents = sortedBids.filter((b) => b.intent === 'HOLD_SILENT');
+  const floorEvent = {
+    type: 'STRATEGIC_FLOOR',
+    summary: `🎙️ ${winnerBid.speakerName} (${winnerBid.dialectTag}) took the mic in orderly turn (${silentAgents.length} idols holding strategic silence).`,
+    clashingSpeakerIds: [winnerBid.speakerId],
+    yielderId: null,
+    winnerId: winnerBid.speakerId,
+    winnerName: winnerBid.speakerName,
+    silentAgentIds: silentAgents.map((s) => s.speakerId),
+    timestamp: new Date().toISOString()
+  };
 
   // Record speaker history & bystander callout flag
   game.speakerHistoryThisRound.push(winnerBid.speakerId);
@@ -689,25 +782,19 @@ export async function generateDiscussionDebateTurn(
     speakerName: bid.speakerName,
     dialectTag: bid.dialectTag,
     intent:
-      yielderBid && bid.speakerId === yielderBid.speakerId
-        ? 'YIELDED_MIC'
-        : bid.speakerId === winnerBid.speakerId
-          ? bid.intent
-          : bid.intent === 'HOLD_SILENT'
-            ? 'HOLD_SILENT'
-            : 'WAITING_TURN',
+      bid.speakerId === winnerBid.speakerId
+        ? 'SPEAK'
+        : bid.intent === 'HOLD_SILENT'
+          ? 'HOLD_SILENT'
+          : 'WAITING_TURN',
     urgency: bid.urgency,
     yieldStyle: bid.yieldStyle,
     publicStatusText:
-      yielderBid && bid.speakerId === yielderBid.speakerId
-        ? `🤝 Clashed & yielded mic to ${winnerBid.speakerName}`
-        : bid.speakerId === winnerBid.speakerId
-          ? bid.intent === 'INTERRUPT'
-            ? `🔥 Interrupting (${bid.urgency}% urgency)`
-            : `🎙️ Speaking (${bid.urgency}% urgency)`
-          : bid.intent === 'HOLD_SILENT'
-            ? `🤫 Strategic Silence`
-            : `✋ Wanted mic (${bid.urgency}%)`,
+      bid.speakerId === winnerBid.speakerId
+        ? `🎙️ Speaking (${bid.urgency}% priority)`
+        : bid.intent === 'HOLD_SILENT'
+          ? `🤫 Strategic Silence`
+          : `✋ Waiting turn (${bid.urgency}%)`,
     innerThought: bid.innerThought
   }));
 
@@ -715,8 +802,6 @@ export async function generateDiscussionDebateTurn(
   for (const player of aiPlayers) {
     if (player.id === winnerBid.speakerId) {
       player.currentExpression = winnerBid.draft.emotion || 'speaking';
-    } else if (yielderBid && player.id === yielderBid.speakerId) {
-      player.currentExpression = 'shocked';
     } else if (winnerBid.draft.targetPlayerId === player.id) {
       player.currentExpression = 'shocked';
     } else {
@@ -725,7 +810,7 @@ export async function generateDiscussionDebateTurn(
     }
   }
 
-  // Step 2: Generate high-depth Gemini 4 Argon dialogue for the winning speaker (and yield line if collision occurred)
+  // Step 2: Generate high-depth Gemini 4 Argon dialogue for the winning speaker
   const winnerIdol = aiPlayers.find((p) => p.id === winnerBid.speakerId) || aiPlayers[0];
   const winnerPrivateView = buildPrivatePlayerView(game, winnerIdol.id);
   const proposedNames = effectiveTeamIds.map((id) => getPlayerName(game, id));
@@ -735,41 +820,22 @@ export async function generateDiscussionDebateTurn(
       : `Leader ${winnerPrivateView.boardSummary.leaderName} is currently deciding which ${activeQuest.teamSize} members to pick for Quest ${activeQuest.questNumber} (TEAM_PROPOSAL lobbying phase)`
     : `Leader ${winnerPrivateView.boardSummary.leaderName} proposed Team: [${proposedNames.join(', ')}]`;
 
-  let yieldTurnPayload = null;
-  let yieldTtsPromise = null;
-  if (yielderBid) {
-    const yielderIdol = aiPlayers.find((p) => p.id === yielderBid.speakerId);
-    const yieldLine = buildDialectMicYieldLine(yielderIdol, winnerIdol, yielderBid.draft.text);
-    yieldTtsPromise = synthesizeSpeechTTS({
-      speakerId: yielderIdol.id,
-      voiceName: yielderIdol.voiceName,
-      text: yieldLine,
-      skipTts: Boolean(game?.skipTts)
-    });
-    yieldTurnPayload = {
-      speakerId: yielderIdol.id,
-      speakerName: yielderIdol.name,
-      dialectTag: yielderIdol.dialectTag,
-      floorEventType: 'MIC_CLASH_YIELD',
-      text: yieldLine,
-      emotion: 'shocked',
-      innerThought: `[MIC CLASH & YIELD] I unmuted at the exact same time as ${winnerIdol.name} (my urgency: ${yielderBid.urgency}). ${yielderBid.innerThought} I'll let ${winnerIdol.name} speak first and watch if she slips up!`,
-      targetPlayerId: winnerIdol.id,
-      modelUsed: 'gemini-3.8-flash',
-      thinkingLevel: 'low',
-      verificationPassed: true,
-      verificationNote: 'Verified: Multi-Agent Floor Yield & Epistemic Check Passed',
-      videoUrl: null,
-      videoTaskId: null
-    };
-  }
+  const yieldTurnPayload = null;
+  const yieldTtsPromise = null;
+
+  const actionableBoardFacts = buildActionableBoardFacts(
+    game,
+    winnerPrivateView,
+    effectiveTeamIds,
+    isPreProposalPhase
+  );
 
   const prompt = `You are an autonomous AI agent playing a live 7-player game of The Resistance: Avalon on a K-Pop Variety Show Discord call.
 YOUR CHARACTER & SECRET ROLE:
 - Name: ${winnerPrivateView.self.name} (${winnerPrivateView.self.koreanName || ''} — ${winnerPrivateView.self.archetype})
-- Character Background (Reference ONLY rarely when natural, never force into every turn): ${JSON.stringify(winnerPrivateView.self.namuwikiProfile || {})}
+- Deduction Playstyle: ${winnerPrivateView.self.namuwikiProfile?.playstyle || winnerPrivateView.self.archetype}
+- Signature Move: ${winnerPrivateView.self.namuwikiProfile?.signatureMove || winnerPrivateView.self.personality}
 - Vibe: ${winnerPrivateView.self.dialectTag}
-- Personality: ${winnerPrivateView.self.personality}
 - Conversational Tone: ${winnerPrivateView.self.speechStyle}
 - Secret Avalon Role: ${winnerPrivateView.self.roleName} (${winnerPrivateView.self.alignment})
 - ${winnerPrivateView.epistemicVision.nightVisionText}
@@ -786,34 +852,58 @@ MULTI-AGENT FLOOR CONTEXT RIGHT NOW:
           .join(', ')}].`
   }
 
-CURRENT BOARD STATE:
+CURRENT BOARD STATE & ACTIONABLE AVALON FACTS:
 - Quest ${activeQuest.questNumber} (Team Size: ${activeQuest.teamSize}, Fails Required: ${activeQuest.failsRequired})
 - Score: Good ${winnerPrivateView.boardSummary.goodScore} vs Evil ${winnerPrivateView.boardSummary.evilScore} | Reject Track: ${winnerPrivateView.boardSummary.rejectTrack}/5
 - ${teamStatusLine}
 - Are YOU on/highlighted for the team?: ${effectiveTeamIds.includes(winnerIdol.id) ? 'YES' : 'NO'}
+${actionableBoardFacts}
 - Your Bayesian Evil Suspicion Ranking: ${JSON.stringify(winnerPrivateView.suspicionRanking)}
-- Past Quest Results: ${JSON.stringify(winnerPrivateView.boardSummary.questHistory)}
 - Recent Live Conversation: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
+${
+  lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+    ? `- Immediately Preceding AI Speaker (${lastAiTurn.speakerName}): "${lastAiTurn.text}"${
+        lastAiTurn.targetPlayerId === winnerIdol.id
+          ? ` [ALERT: ${lastAiTurn.speakerName} JUST QUESTIONED OR ACCUSED YOU DIRECTLY!]`
+          : ''
+      }`
+    : ''
+}
 
 ${
   humanMessage
-    ? `CRITICAL LIVE INPUT: Special Guest (${humanPlayer.name}) just said to the room: "${humanMessage}". Respond DIRECTLY and specifically to what ${humanPlayer.name} just said while acting according to your secret role (${winnerPrivateView.self.roleName})!`
+    ? `CRITICAL LIVE INPUT FROM HUMAN PLAYER (${humanPlayer.name}):
+${humanPlayer.name} just said to the room (may be in Korean or English): "${humanMessage}".
+1. In your innerThought, explicitly analyze what ${humanPlayer.name} just meant/asked from your secret role perspective (${winnerPrivateView.self.roleName}).
+2. In your spoken text (100% English), DIRECTLY answer ${humanPlayer.name}'s exact question, accusation, or team suggestion in your opening clause by name, then state your concrete stance on the Quest ${activeQuest.questNumber} roster (${proposedNames.length > 0 ? `[${proposedNames.join(', ')}]` : `${activeQuest.teamSize} seats`})!`
     : isBystanderSilent
-      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Call out ${humanPlayer.name} directly—ask if they are hiding as Merlin or playing Oberon!`
+      ? `BYSTANDER SILENCE ALERT: Special Guest (${humanPlayer.name}) has been completely silent this round! Ask ${humanPlayer.name} directly whether they plan to vote APPROVE or REJECT on ${proposedNames.length > 0 ? `[${proposedNames.join(', ')}]` : `Quest ${activeQuest.questNumber}`} and why they're hiding!`
       : isPreProposalPhase
-        ? `PRE-PROPOSAL LOBBYING: Lobby Leader ${winnerPrivateView.boardSummary.leaderName} right now before the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team is locked in! Pitch why YOU (or a trusted ally) should be picked—or warn ${winnerPrivateView.boardSummary.leaderName} who NOT to bring—using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
-        : `Deliver your sharp reaction to the previous speaker and Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] using your character's personality and secret role strategy (${winnerPrivateView.self.roleName})!`
+        ? `PRE-PROPOSAL LOBBYING & INTER-AI DIALOGUE (ADVANCE THE GAME):
+${
+  lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+    ? `First, briefly react to ${lastAiTurn.speakerName}'s just-spoken pitch ("${lastAiTurn.text}") — agree with ${lastAiTurn.speakerName} or counter ${lastAiTurn.speakerName}'s claim by name! Then lobby Leader ${winnerPrivateView.boardSummary.leaderName} on who to pick and who to exclude for the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team!`
+    : `Lobby Leader ${winnerPrivateView.boardSummary.leaderName} right now before the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team is locked in! Explicitly name who ${winnerPrivateView.boardSummary.leaderName} should pick and who ${winnerPrivateView.boardSummary.leaderName} must keep OFF the ${activeQuest.teamSize}-player roster!`
+}`
+        : `TEAM DEBATE, INTER-AI CROSS-EXAMINATION & VOTE PROGRESSION (ADVANCE THE GAME):
+${
+  lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+    ? lastAiTurn.targetPlayerId === winnerIdol.id
+      ? `${lastAiTurn.speakerName} just called YOU out directly saying: "${lastAiTurn.text}"! Directly answer or rebut ${lastAiTurn.speakerName} by name in your opening words, state whether you are voting APPROVE or REJECT on [${proposedNames.join(', ')}], give your round-accurate Avalon reason, and challenge the next player!`
+      : `First, directly respond to ${lastAiTurn.speakerName}'s preceding argument ("${lastAiTurn.text}") by name — either backing ${lastAiTurn.speakerName}'s read or exposing a flaw in ${lastAiTurn.speakerName}'s logic! Then state explicitly whether you are voting APPROVE or REJECT on [${proposedNames.join(', ')}] and challenge a specific player to respond!`
+    : `React directly to Leader ${winnerPrivateView.boardSummary.leaderName}'s proposed team [${proposedNames.join(', ')}] and move the room toward the vote! State explicitly whether you are voting APPROVE or REJECT on [${proposedNames.join(', ')}], explain the exact Avalon board reason, and challenge a specific player to respond!`
+}`
 }
 
-STRICT ANTI-REPETITION & NATURAL DIALOGUE RULES:
-- Speak in natural, smart, conversational English like a real 20-year-old K-Pop idol — 1 to 2 sentences (20-38 words).
-- NEVER use the word "Aigoo" or "Aigo" under any circumstances.
-- NEVER repeat opening interjections, slang words, or food bets (such as "Mwo-ra-ka-no", "Fair dinkum", "Dodok-nom", "Geu-ryeo", or betting food) that already appeared in Recent Live Conversation.
-- Focus 90% of your line on concrete Avalon game logic (vote history, team overlap, why you trust or doubt specific players) and vary your sentence openings every turn.
-- Never reveal forbidden role knowledge directly (if Merlin, disguise your knowledge as vote/behavior analysis!).
+MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
+- Speak in natural, sharp, conversational English — 1 to 2 sentences (20-38 words).
+- 100% OF YOUR LINE MUST PROGRESS THE AVALON GAME: Every turn must include (1) a direct reaction to ${humanMessage ? humanPlayer.name : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id ? lastAiTurn.speakerName : `Leader ${winnerPrivateView.boardSummary.leaderName}`}, (2) a concrete roster pick or explicit APPROVE / REJECT stance on the current team with a round-accurate Avalon reason, and (3) a direct question or call-to-vote.
+- ZERO OFF-TOPIC TALK: NEVER mention food, snacks, drinks, restaurants, or non-game hobbies. Your persona is expressed through your tone and deduction style, NOT by talking about food.
+- NEVER use the word "Aigoo" or "Aigo", and never repeat opening catchphrases that already appeared in Recent Live Conversation.
+- Never reveal forbidden role knowledge directly (if Merlin, disguise your knowledge as team/vote analysis!).
 - Return ONLY valid JSON:
 {
-  "innerThought": "Your private internal Avalon role strategy & acting reason as ${winnerPrivateView.self.roleName}",
+  "innerThought": "Your private internal Avalon role strategy & how you are reacting to ${humanMessage ? humanPlayer.name : lastAiTurn ? lastAiTurn.speakerName : 'the board'} as ${winnerPrivateView.self.roleName}",
   "text": "Your spoken dialogue on the call",
   "emotion": "speaking" | "suspicious" | "shocked",
   "targetPlayerId": "player_id_you_are_questioning_or_addressing"
@@ -860,6 +950,27 @@ STRICT ANTI-REPETITION & NATURAL DIALOGUE RULES:
     Object.assign(yieldTurnPayload, yieldTts);
   }
 
+  const replyToSpeakerId = humanMessage
+    ? humanPlayer.id
+    : yielderBid
+      ? yielderBid.speakerId
+      : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+        ? lastAiTurn.speakerId
+        : game.leaderId !== winnerIdol.id
+          ? game.leaderId
+          : null;
+  const replyToSpeakerName = replyToSpeakerId ? getPlayerName(game, replyToSpeakerId) : null;
+  const replyToSnippet = humanMessage
+    ? String(humanMessage).slice(0, 48)
+    : yielderBid && yieldTurnPayload
+      ? String(yieldTurnPayload.text).slice(0, 48)
+      : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+        ? String(lastAiTurn.text).slice(0, 48)
+        : null;
+  const targetPlayerName = verified.targetPlayerId
+    ? getPlayerName(game, verified.targetPlayerId)
+    : null;
+
   return {
     speakerId: winnerIdol.id,
     dialectTag: winnerIdol.dialectTag,
@@ -869,6 +980,10 @@ STRICT ANTI-REPETITION & NATURAL DIALOGUE RULES:
         ? 'URGENT_INTERRUPT'
         : 'SPEAK',
     ...verified,
+    targetPlayerName,
+    replyToSpeakerId,
+    replyToSpeakerName,
+    replyToSnippet,
     modelUsed: llmResult.modelUsed,
     thinkingLevel: llmResult.thinkingLevel,
     ...ttsPayload,
@@ -938,6 +1053,7 @@ async function evaluateSingleIdolFloorBid(
     isBystanderSilent,
     lastSpeakerId,
     lastTargetId,
+    lastAiTurn = null,
     effectiveTeamIds = [],
     isPreProposalPhase = false
   }
@@ -967,7 +1083,8 @@ async function evaluateSingleIdolFloorBid(
     isBystanderSilent,
     humanNamedMe,
     proposedIds,
-    isPreProposalPhase
+    isPreProposalPhase,
+    lastAiTurn
   );
 
   // Compute strategic urgency & intent based on secret Avalon role + situational triggers
@@ -1127,44 +1244,44 @@ function prependCollisionHandoffPhrase(winnerIdol, yielderName, baseText) {
 
 /**
  * Infuses an idol's natural conversational tone into fallback dialogue using a rotating pool
- * so lines never repeat the same opening or closing phrase.
+ * without injecting round-inaccurate vote claims or off-topic filler.
  */
 function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone') {
   const variantIdx = (coreSentence.length + targetName.length) % 4;
   switch (speakerId) {
     case 'idol_sullyoon': {
       const variants = [
-        `Wait a second—${coreSentence} That doesn't match the earlier vote pattern at all.`,
+        `Wait a second—${coreSentence}`,
         `I've been listening quietly, and ${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`,
-        `${coreSentence} Honestly, that contradiction is really hard to ignore right now.`,
-        `Hold on, let's think about this carefully. ${coreSentence}`
+        `${coreSentence} We need to be careful before locking our votes on this slot.`,
+        `Hold on, let's check this lineup carefully: ${coreSentence}`
       ];
       return variants[variantIdx];
     }
     case 'idol_yuna': {
       const variants = [
-        `${coreSentence} Funny how everyone suddenly gets quiet when that comes up, right?`,
-        `Wait a minute~ ${coreSentence} Let's see how ${targetName} explains that one.`,
-        `${coreSentence} If we approve this blindly, Evil is going to thank us for the free point.`,
-        `Hold on, look at how fast this lineup came together—${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`
+        `${coreSentence} Let's see how ${targetName} defends that seat before we vote.`,
+        `Wait a minute~ ${coreSentence}`,
+        `${coreSentence} If we approve the wrong roster here, Evil gets a free point.`,
+        `Hold on, look at this Quest lineup—${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`
       ];
       return variants[variantIdx];
     }
     case 'idol_hanni': {
       const variants = [
-        `Hang on a second—${coreSentence} I reckon ${targetName} needs to explain that vote.`,
-        `${coreSentence} Honestly, that whole excuse sounds a bit dodgy to me.`,
-        `Wait on, let's look at the numbers. ${coreSentence}`,
-        `${coreSentence} Let's hear what ${targetName} has to say before we lock our votes.`
+        `Hang on a second—${coreSentence}`,
+        `${coreSentence} I reckon ${targetName} should answer before we lock our votes.`,
+        `Wait on, let's look at the actual Quest slots: ${coreSentence}`,
+        `${coreSentence} Let's hear ${targetName}'s stance right now.`
       ];
       return variants[variantIdx];
     }
     case 'idol_wonyoung': {
       const variants = [
         `Listen for a second, everyone—${coreSentence}`,
-        `${coreSentence} Catching this before we vote is actually a huge advantage for the Good team.`,
-        `Honestly, if we look at the board calmly, ${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`,
-        `${coreSentence} Let's make sure we don't hand Mordred an easy round here.`
+        `${coreSentence} Locking Down the right Quest roster now gives the Good team a clear path.`,
+        `Honestly, looking at the board right now, ${coreSentence.charAt(0).toLowerCase() + coreSentence.slice(1)}`,
+        `${coreSentence} Let's make sure every seat on this Quest is accounted for.`
       ];
       return variants[variantIdx];
     }
@@ -1172,18 +1289,18 @@ function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone'
       const variants = [
         `Let's be real right now: ${coreSentence}`,
         `${coreSentence} Give us a straight answer before the vote timer runs out.`,
-        `Hold up, we can't afford a careless vote here. ${coreSentence}`,
-        `${coreSentence} If nobody can justify this pick, I'm voting Reject.`
+        `Hold up, we can't waste a Quest slot here. ${coreSentence}`,
+        `${coreSentence} Everyone needs to commit to Approve or Reject right now.`
       ];
       return variants[variantIdx];
     }
     case 'idol_karina':
     default: {
       const variants = [
-        `Look at the vote ledger from the last round. ${coreSentence}`,
-        `${coreSentence} Statistically, we need to verify that slot before approving.`,
-        `Let's focus on the actual numbers here: ${coreSentence}`,
-        `${coreSentence} That's the main risk factor on the board right now.`
+        `Let's look at the exact Quest math here: ${coreSentence}`,
+        `${coreSentence} We need to verify every slot before locking our votes.`,
+        `Focusing strictly on the board state: ${coreSentence}`,
+        `${coreSentence} That's the deciding factor for this Quest vote.`
       ];
       return variants[variantIdx];
     }
@@ -1191,8 +1308,8 @@ function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone'
 }
 
 /**
- * Dynamic, context-sensitive Avalon debate engine fallback that reads actual human chat,
- * bystander silence, proposed team composition, secret role alignment, AND each idol's distinct regional dialect!
+ * Dynamic, round-accurate Avalon debate engine fallback that reads actual human chat,
+ * bystander silence, proposed team composition, and secret role alignment to advance the game.
  */
 function buildContextualDebateFallback(
   game,
@@ -1202,7 +1319,8 @@ function buildContextualDebateFallback(
   isBystanderSilent,
   humanNamedMe = false,
   effectiveTeamIds = [],
-  isPreProposalPhase = false
+  isPreProposalPhase = false,
+  lastAiTurn = null
 ) {
   const role = privateView.self;
   const humanPlayer = game.players.find((p) => p.isHuman);
@@ -1214,39 +1332,71 @@ function buildContextualDebateFallback(
   const teamLabel =
     proposedNames.length > 0
       ? `[${proposedNames.join(', ')}]`
-      : `the Quest ${activeQuest.questNumber} squad`;
+      : `the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} team`;
 
-  // Find most suspicious player on the proposed team from speaker's epistemic view
+  const hasHistory = game.voteHistory.length > 0 || game.questHistory.length > 0;
+  const lastFailedQuest = [...game.questHistory].reverse().find((q) => q.outcome === 'FAIL');
+
+  // Find most suspicious player on the proposed team and cleanest external ally from speaker's epistemic view
   const teamSuspects = privateView.suspicionRanking.filter(
     (s) => proposedIds.includes(s.playerId) && s.playerId !== speaker.id
   );
   const topTeamSuspect = teamSuspects[0] || privateView.suspicionRanking[0];
+  const cleanAlly =
+    privateView.suspicionRanking[privateView.suspicionRanking.length - 1] ||
+    privateView.suspicionRanking[0];
+
+  const hasPrevAi = Boolean(lastAiTurn && lastAiTurn.speakerId !== speaker.id);
+  const prevAiSnippet = hasPrevAi ? String(lastAiTurn.text || '').slice(0, 44) : '';
+  const prevAiThoughtPrefix = hasPrevAi
+    ? lastAiTurn.targetPlayerId === speaker.id
+      ? `[Countering ${lastAiTurn.speakerName}'s direct callout ("${prevAiSnippet}...")] `
+      : `[Evaluating ${lastAiTurn.speakerName}'s claim ("${prevAiSnippet}...")] `
+    : '';
+  const prevAiSpeechPrefix = hasPrevAi
+    ? lastAiTurn.targetPlayerId === speaker.id
+      ? `${lastAiTurn.speakerName}, since you just called me out—`
+      : /\bREJECT\b/i.test(lastAiTurn.text || '')
+        ? `Hearing ${lastAiTurn.speakerName}'s push to reject—`
+        : /\bAPPROVE\b/i.test(lastAiTurn.text || '')
+          ? `Responding to ${lastAiTurn.speakerName}'s call to approve—`
+          : `Following up on ${lastAiTurn.speakerName}'s point—`
+    : '';
 
   // Case A: Direct live reply to the Human Player's message!
   if (humanMessage) {
     const cleanMsg = humanMessage.trim();
     const isQuestion = cleanMsg.includes('?') || /어때|믿어도|누구|왜|진짜|생각/i.test(cleanMsg);
     const calloutPrefix = humanNamedMe
-      ? `${humanPlayer.name}, since you called on ${speaker.name} directly`
-      : `Hearing what ${humanPlayer.name} just said ("${cleanMsg.slice(0, 32)}")`;
+      ? `${humanPlayer.name}, since you asked me directly`
+      : `Responding to ${humanPlayer.name}'s point ("${cleanMsg.slice(0, 28)}")`;
 
     if (role.alignment === 'EVIL') {
+      const stanceText = isPreProposalPhase
+        ? `Leader ${leaderName} should put me and ${humanPlayer.name} on Quest ${activeQuest.questNumber} and leave ${topTeamSuspect.playerName} off!`
+        : proposedIds.includes(speaker.id)
+          ? `I'm voting APPROVE on ${teamLabel} for Quest ${activeQuest.questNumber}, and ${humanPlayer.name} should back this lineup too!`
+          : `I'm voting REJECT on ${teamLabel} because ${topTeamSuspect.playerName} shouldn't take a Quest ${activeQuest.questNumber} seat over me!`;
       return {
-        innerThought: `As ${role.roleName} (Evil), ${humanPlayer.name} just said "${cleanMsg}". I'm jumping in (${humanNamedMe ? 'since my name was called!' : 'to steer the room'}) to deflect suspicion onto ${topTeamSuspect.playerName} while sounding like a loyal Good Citizen.`,
+        innerThought: `[Replying to ${humanPlayer.name}: "${cleanMsg}"] As ${role.roleName} (Evil), I'm answering ${humanPlayer.name} while steering the Quest ${activeQuest.questNumber} roster and deflecting suspicion onto ${topTeamSuspect.playerName}.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `${calloutPrefix}—for ${teamLabel}, you can trust me 100%, but ${topTeamSuspect.playerName}'s behavior for Quest ${activeQuest.questNumber} is super suspicious!`,
+          `${calloutPrefix}—${stanceText}`,
           humanPlayer.name
         ),
         emotion: isQuestion ? 'speaking' : 'suspicious',
         targetPlayerId: humanPlayer.id
       };
     }
+
+    const goodStanceText = isPreProposalPhase
+      ? `for Quest ${activeQuest.questNumber} (${activeQuest.teamSize} players), Leader ${leaderName} should take me and ${cleanAlly.playerName} while keeping ${topTeamSuspect.playerName} off the team!`
+      : `on ${teamLabel} for Quest ${activeQuest.questNumber}, ${topTeamSuspect.playerName} is my highest-risk slot, so I'm leaning REJECT unless ${topTeamSuspect.playerName} justifies that seat!`;
     return {
-      innerThought: `As ${role.roleName} (Good), ${humanPlayer.name} raised a live point ("${cleanMsg}"). Cross-checking against my suspicion matrix where ${topTeamSuspect.playerName} sits at ${Math.round(topTeamSuspect.evilProbability * 100)}% Evil probability.`,
+      innerThought: `[Replying to ${humanPlayer.name}: "${cleanMsg}"] As ${role.roleName} (Good), I'm answering ${humanPlayer.name}'s question with a concrete Quest ${activeQuest.questNumber} read on ${topTeamSuspect.playerName}.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `${calloutPrefix}—looking at ${teamLabel} for Quest ${activeQuest.questNumber}, my biggest red flag is still ${topTeamSuspect.playerName}!`,
+        `${calloutPrefix}—${goodStanceText}`,
         topTeamSuspect.playerName
       ),
       emotion: 'speaking',
@@ -1257,10 +1407,10 @@ function buildContextualDebateFallback(
   // Case B: Human Player is staying completely silent (Bystander Mode)!
   if (isBystanderSilent) {
     return {
-      innerThought: `As ${role.roleName}, I notice ${humanPlayer.name} hasn't spoken a single word this round. Silent bystanders are either Merlin hiding from the Assassin or Oberon watching us clash.`,
+      innerThought: `As ${role.roleName}, ${humanPlayer.name} hasn't spoken this round. Forcing ${humanPlayer.name} to declare an explicit APPROVE or REJECT stance on ${teamLabel}.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `${humanPlayer.name} hasn't said a single word this whole round—are you staying quiet because you're Merlin hiding from the Assassin, or Oberon watching us fight over ${teamLabel}?!`,
+        `${humanPlayer.name}, you haven't said a word this round—are you voting APPROVE or REJECT on ${teamLabel} for Quest ${activeQuest.questNumber}, and who is your top suspect?`,
         humanPlayer.name
       ),
       emotion: 'suspicious',
@@ -1275,10 +1425,10 @@ function buildContextualDebateFallback(
         privateView.epistemicVision.knownEvilIds[0] || topTeamSuspect.playerId;
       const evilTargetName = getPlayerName(game, evilTargetId);
       return {
-        innerThought: `As Merlin during TEAM_PROPOSAL, I must subtly lobby Leader ${leaderName} not to include ${evilTargetName} (known Evil) on the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team.`,
+        innerThought: `${prevAiThoughtPrefix}As Merlin during TEAM_PROPOSAL, lobbying Leader ${leaderName} to exclude ${evilTargetName} (known Evil) and pick me and ${cleanAlly.playerName} for Quest ${activeQuest.questNumber}.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `Leader ${leaderName}, before you lock in the ${activeQuest.teamSize} spots for Quest ${activeQuest.questNumber}, I'd be very careful about bringing ${evilTargetName}—put me on the squad instead so we get clean data!`,
+          `${prevAiSpeechPrefix}Leader ${leaderName}, for the ${activeQuest.teamSize} seats on Quest ${activeQuest.questNumber}, pick me and ${cleanAlly.playerName} and leave ${evilTargetName} off so we get a clean mission!`,
           leaderName
         ),
         emotion: 'suspicious',
@@ -1287,10 +1437,10 @@ function buildContextualDebateFallback(
     }
     if (role.alignment === 'EVIL') {
       return {
-        innerThought: `As ${role.roleName} (Evil) during TEAM_PROPOSAL, I'm lobbying Leader ${leaderName} to put me on the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} squad while casting doubt on ${topTeamSuspect.playerName}.`,
+        innerThought: `${prevAiThoughtPrefix}As ${role.roleName} (Evil) during TEAM_PROPOSAL, lobbying Leader ${leaderName} to include me in the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} lineup and drop ${topTeamSuspect.playerName}.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `Leader ${leaderName}, pick me for one of the ${activeQuest.teamSize} seats on Quest ${activeQuest.questNumber}—I'm ready to prove I'm Good, whereas ${topTeamSuspect.playerName} has been acting way too cagey!`,
+          `${prevAiSpeechPrefix}Leader ${leaderName}, put me on the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} roster and keep ${topTeamSuspect.playerName} off—I'll vote APPROVE if I'm included!`,
           leaderName
         ),
         emotion: 'speaking',
@@ -1298,10 +1448,10 @@ function buildContextualDebateFallback(
       };
     }
     return {
-      innerThought: `As ${role.roleName} (Good) during TEAM_PROPOSAL, I'm pitching Leader ${leaderName} to include me on the ${activeQuest.teamSize}-person Quest ${activeQuest.questNumber} team and keep ${topTeamSuspect.playerName} off.`,
+      innerThought: `${prevAiThoughtPrefix}As ${role.roleName} (Good) during TEAM_PROPOSAL, pitching Leader ${leaderName} to include me on the ${activeQuest.teamSize}-player Quest ${activeQuest.questNumber} team and exclude ${topTeamSuspect.playerName}.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `Leader ${leaderName}, since we need ${activeQuest.teamSize} clean players for Quest ${activeQuest.questNumber}, take me with you and think twice before giving ${topTeamSuspect.playerName} a spot!`,
+        `${prevAiSpeechPrefix}Leader ${leaderName}, we need ${activeQuest.teamSize} clean players for Quest ${activeQuest.questNumber}—put me on this roster instead of ${topTeamSuspect.playerName} so I can vote APPROVE!`,
         leaderName
       ),
       emotion: 'speaking',
@@ -1309,7 +1459,7 @@ function buildContextualDebateFallback(
     };
   }
 
-  // Case C: Role-driven analysis of the proposed team in signature regional dialect
+  // Case C: Role-driven analysis of the proposed team that directly progresses the vote
   if (role.roleId === 'MERLIN') {
     const evilOnTeam = proposedIds.filter((id) =>
       privateView.epistemicVision.knownEvilIds.includes(id)
@@ -1317,23 +1467,31 @@ function buildContextualDebateFallback(
     if (evilOnTeam.length > 0) {
       const culpritId = evilOnTeam[0];
       const culpritName = getPlayerName(game, culpritId);
+      const reasonClause = lastFailedQuest
+        ? `after Quest ${lastFailedQuest.questNumber} failed, keeping ${culpritName} on [${proposedNames.join(', ')}] is too dangerous`
+        : hasHistory
+          ? `based on the last vote split, ${culpritName}'s slot on [${proposedNames.join(', ')}] is way too risky`
+          : `for our opening Quest 1 scout team, pairing ${culpritName} on [${proposedNames.join(', ')}] gives us poor information control`;
       return {
-        innerThought: `As Merlin, I see ${culpritName} (Evil) on the proposed team [${proposedNames.join(', ')}]. I must convince the table to REJECT this proposal using vote logic so the Assassin doesn't clock me as Merlin.`,
+        innerThought: `${prevAiThoughtPrefix}As Merlin, I see ${culpritName} (Evil) on [${proposedNames.join(', ')}]. Calling for a REJECT vote and proposing a swap to ${cleanAlly.playerName} without exposing my night vision.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `Look closely at [${proposedNames.join(', ')}]—${culpritName}'s voting pattern from earlier doesn't add up at all, so putting ${culpritName} on Quest ${activeQuest.questNumber} is way too risky!`,
+          `${prevAiSpeechPrefix}I'm voting REJECT on [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}—${reasonClause}, so we should swap ${culpritName} for ${cleanAlly.playerName}!`,
           culpritName
         ),
         emotion: 'suspicious',
         targetPlayerId: culpritId
       };
     }
+    const approveReason = hasHistory
+      ? `[${proposedNames.join(', ')}] avoids every major suspect from earlier rounds`
+      : `[${proposedNames.join(', ')}] is a clean 2-player opening scout pair to test on Quest 1`;
     return {
-      innerThought: `As Merlin, I can see that [${proposedNames.join(', ')}] contains 0 Evil players! I'll subtly endorse this team so Good scores a clean Quest ${activeQuest.questNumber} win.`,
+      innerThought: `${prevAiThoughtPrefix}As Merlin, [${proposedNames.join(', ')}] has 0 Evil players. Endorsing an immediate APPROVE vote for Quest ${activeQuest.questNumber}.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `Looking at the vote history for Quest ${activeQuest.questNumber}, [${proposedNames.join(', ')}] is actually the cleanest squad we've seen so far—we should approve this team!`,
-        getPlayerName(game, game.leaderId)
+        `${prevAiSpeechPrefix}I'm voting APPROVE on [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber} because ${approveReason}—how is everyone else voting?`,
+        leaderName
       ),
       emotion: 'speaking',
       targetPlayerId: game.leaderId
@@ -1344,11 +1502,14 @@ function buildContextualDebateFallback(
     const candidates = privateView.epistemicVision.merlinCandidateIds.map((id) =>
       getPlayerName(game, id)
     );
+    const percivalReason = hasHistory
+      ? `before I vote APPROVE or REJECT on [${proposedNames.join(', ')}], why did Leader ${leaderName} include ${topTeamSuspect.playerName} after the earlier rounds?`
+      : `for Quest 1's opening 2-player team [${proposedNames.join(', ')}], why did Leader ${leaderName} pick ${topTeamSuspect.playerName} over ${cleanAlly.playerName}?`;
     return {
-      innerThought: `As Percival, my two Merlin/Morgana candidates are [${candidates.join(' and ')}]. I'm watching how they react to [${proposedNames.join(', ')}] to figure out who is the true Merlin and who is Morgana.`,
+      innerThought: `${prevAiThoughtPrefix}As Percival, my two Merlin/Morgana candidates are [${candidates.join(' and ')}]. Pressing Leader ${leaderName} on ${topTeamSuspect.playerName}'s slot before locking my vote.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `I'm watching everyone's reactions to [${proposedNames.join(', ')}] very carefully right now—why should ${topTeamSuspect.playerName} get a seat on Quest ${activeQuest.questNumber} over the rest of us?`,
+        `${prevAiSpeechPrefix}Hold on—${percivalReason}`,
         topTeamSuspect.playerName
       ),
       emotion: 'suspicious',
@@ -1363,22 +1524,28 @@ function buildContextualDebateFallback(
         privateView.epistemicVision.knownEvilTeammateIds.includes(id)
     ).length;
     if (evilCountOnTeam >= 1) {
+      const evilApproveReason =
+        game.rejectTrack >= 2
+          ? `Reject Track is already at ${game.rejectTrack}/5 and [${proposedNames.join(', ')}] is our best shot at Quest ${activeQuest.questNumber}`
+          : hasHistory
+            ? `[${proposedNames.join(', ')}] is the most balanced Quest ${activeQuest.questNumber} lineup we've seen`
+            : `approving [${proposedNames.join(', ')}] on Quest 1 gives the table immediate baseline data instead of stalling`;
       return {
-        innerThought: `As ${role.roleName} (Evil), our Evil side has presence on [${proposedNames.join(', ')}]. I will push the table to APPROVE this team so we can sabotage Quest ${activeQuest.questNumber}.`,
+        innerThought: `${prevAiThoughtPrefix}As ${role.roleName} (Evil), we have Evil presence on [${proposedNames.join(', ')}]. Pushing the table to vote APPROVE on Quest ${activeQuest.questNumber}.`,
         text: stylizeWithIdolDialect(
           speaker.id,
-          `If we keep rejecting every proposal we'll hit the 5-vote Hammer! [${proposedNames.join(', ')}] is a solid test for Quest ${activeQuest.questNumber}, let's vote Approve!`,
-          getPlayerName(game, game.leaderId)
+          `${prevAiSpeechPrefix}I'm voting APPROVE on [${proposedNames.join(', ')}]—${evilApproveReason}, so let's lock this team in!`,
+          leaderName
         ),
         emotion: 'speaking',
         targetPlayerId: game.leaderId
       };
     }
     return {
-      innerThought: `As ${role.roleName} (Evil), neither I nor my known Evil partner is on [${proposedNames.join(', ')}]. I need to sow doubt against ${topTeamSuspect.playerName} so the table rejects this clean team!`,
+      innerThought: `${prevAiThoughtPrefix}As ${role.roleName} (Evil), no Evil players are on [${proposedNames.join(', ')}]. Pushing a REJECT vote and demanding Leader ${leaderName} swap ${topTeamSuspect.playerName} for me.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `Why am I left off Quest ${activeQuest.questNumber} while ${topTeamSuspect.playerName} gets a free ride on [${proposedNames.join(', ')}]?! I am rejecting this lineup!`,
+        `${prevAiSpeechPrefix}I'm voting REJECT on [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}—leaving me off while giving ${topTeamSuspect.playerName} a seat makes zero sense!`,
         topTeamSuspect.playerName
       ),
       emotion: 'shocked',
@@ -1388,12 +1555,15 @@ function buildContextualDebateFallback(
 
   // Loyal Servant (Good Citizen)
   const onTeam = proposedIds.includes(speaker.id);
-  if (!onTeam && topTeamSuspect.evilProbability >= 0.50) {
+  if (!onTeam && topTeamSuspect.evilProbability >= 0.48) {
+    const servantRejectReason = lastFailedQuest
+      ? `after Quest ${lastFailedQuest.questNumber} failed, we cannot risk ${topTeamSuspect.playerName} on [${proposedNames.join(', ')}]`
+      : `I know I'm a Loyal Servant, so leaving me off [${proposedNames.join(', ')}] while bringing ${topTeamSuspect.playerName} is too risky`;
     return {
-      innerThought: `As a Loyal Servant (Good Citizen), I know I am Good, yet I'm off the team while ${topTeamSuspect.playerName} (${Math.round(topTeamSuspect.evilProbability * 100)}% suspicion) is included.`,
+      innerThought: `${prevAiThoughtPrefix}As a Loyal Servant, I know I am Good, yet I'm off the team while ${topTeamSuspect.playerName} is included. Calling to REJECT and swap ${topTeamSuspect.playerName} for me.`,
       text: stylizeWithIdolDialect(
         speaker.id,
-        `Hold on ${getPlayerName(game, game.leaderId)}, I know for a fact I'm a Loyal Servant, so leaving me off while bringing ${topTeamSuspect.playerName} on [${proposedNames.join(', ')}] makes me super nervous!`,
+        `${prevAiSpeechPrefix}I'm voting REJECT on [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}—${servantRejectReason}, so swap ${topTeamSuspect.playerName} for me!`,
         topTeamSuspect.playerName
       ),
       emotion: 'suspicious',
@@ -1401,11 +1571,14 @@ function buildContextualDebateFallback(
     };
   }
 
+  const servantApproveText = onTeam
+    ? `${prevAiSpeechPrefix}Since I'm on [${proposedNames.join(', ')}] and know my own card is Good, I'm voting APPROVE for Quest ${activeQuest.questNumber}—${topTeamSuspect.playerName}, are you approving too?`
+    : `${prevAiSpeechPrefix}Looking at [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}, I'll vote APPROVE only if ${topTeamSuspect.playerName} commits to a clean mission right now!`;
   return {
-    innerThought: `As a Loyal Servant (Good Citizen), evaluating [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}. ${topTeamSuspect.playerName} is my top watch target.`,
+    innerThought: `${prevAiThoughtPrefix}As a Loyal Servant, stating my concrete vote condition on [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber} and pressing ${topTeamSuspect.playerName}.`,
     text: stylizeWithIdolDialect(
       speaker.id,
-      `Looking at [${proposedNames.join(', ')}] for Quest ${activeQuest.questNumber}, I'm only approving if ${topTeamSuspect.playerName} gives us a straight answer right now!`,
+      servantApproveText,
       topTeamSuspect.playerName
     ),
     emotion: 'speaking',
@@ -1789,6 +1962,33 @@ function sanitizeWavBase64(base64Data) {
 }
 
 /**
+ * Normalizes raw dialogue text for smooth, natural-sounding TTS synthesis without
+ * awkward pauses on brackets `[Seoyoung, Rina]`, slashes `1/5`, em-dashes `—`, parenthetical Hangul `(유재호)`, or emojis.
+ *
+ * @param {string} rawText
+ * @returns {string}
+ */
+function cleanTextForTts(rawText) {
+  return String(rawText || '')
+    .replace(/\([가-힣\s]+\)/g, '') // Strip parenthetical Korean names like (유재호)
+    .replace(/\[([^\]]+)\]/g, (_, inner) => {
+      const parts = inner
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+      if (parts.length > 2) return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+      return inner;
+    })
+    .replace(/(\d+)\s*\/\s*(\d+)/g, '$1 of $2')
+    .replace(/\s*[—–~]+\s*/g, ', ')
+    .replace(/[*#_`<>]/g, '')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Synthesizes expressive English speech using `gemini-3.8-flash-tts` (`gemini-3.8-flash-lite-tts`).
  * Returns `audioBase64` when live TTS audio bytes are returned, plus `audioDurationMs` and full voice
  * synthesis parameters so the client audio engine can play neural voice with Web Audio API decoding.
@@ -1816,7 +2016,7 @@ export async function synthesizeSpeechTTS({
     };
   }
   const client = getGenAiClient();
-  const cleanText = String(text || '').trim();
+  const cleanText = cleanTextForTts(text);
   if (!client || !cleanText) {
     return {
       audioBase64: null,
@@ -1828,43 +2028,46 @@ export async function synthesizeSpeechTTS({
   }
 
   const candidateTtsModels = [
-    'gemini-3.8-flash-tts',
-    'gemini-3.8-flash-lite-tts'
+    'gemini-3.8-flash-lite-tts',
+    'gemini-3.8-flash-tts'
   ];
 
-  const candidateVoices = voiceName && voiceName !== 'Kore' ? [voiceName, 'Kore'] : ['Kore'];
+  const primaryVoice = voiceName || 'Kore';
 
   for (const ttsModel of candidateTtsModels) {
-    for (const candidateVoice of candidateVoices) {
-      try {
-        const response = await client.models.generateContent({
+    try {
+      const response = await Promise.race([
+        client.models.generateContent({
           model: ttsModel,
           contents: cleanText,
           config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
               voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: candidateVoice }
+                prebuiltVoiceConfig: { voiceName: primaryVoice }
               }
             }
           }
-        });
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('TTS synthesis latency guard')), 3600)
+        )
+      ]);
 
-        const inlineData =
-          response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
-        if (inlineData?.data) {
-          const { cleanBase64, audioDurationMs } = sanitizeWavBase64(inlineData.data);
-          return {
-            audioBase64: cleanBase64,
-            audioMimeType: inlineData.mimeType || 'audio/wav',
-            audioDurationMs,
-            ttsModel,
-            voiceName: candidateVoice
-          };
-        }
-      } catch {
-        // Try fallback voice or next TTS model candidate
+      const inlineData =
+        response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData;
+      if (inlineData?.data) {
+        const { cleanBase64, audioDurationMs } = sanitizeWavBase64(inlineData.data);
+        return {
+          audioBase64: cleanBase64,
+          audioMimeType: inlineData.mimeType || 'audio/wav',
+          audioDurationMs,
+          ttsModel,
+          voiceName: primaryVoice
+        };
       }
+    } catch {
+      // Try next TTS model candidate
     }
   }
 
@@ -1873,7 +2076,7 @@ export async function synthesizeSpeechTTS({
     audioMimeType: null,
     audioDurationMs: null,
     ttsModel: 'gemini-3.8-flash-tts',
-    voiceName
+    voiceName: primaryVoice
   };
 }
 

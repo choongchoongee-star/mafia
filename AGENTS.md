@@ -2,14 +2,14 @@
 
 ## 1. Multi-Agent Cast & Epistemic Isolation (`src/avalonEngine.js`)
 **IDOL AVALON LIVE** orchestrates **8 distinct personas** inside a **Discord Voice & Video Party Channel (`#avalon-stage-7p`)**:
-- **1 Non-Playing Party Moderator**: **MC Jae-ho (`유재호`, `mc_jaesuk`)** — Paces the Discord voice stage, announces Quest and Vote math, and triggers the **Bystander Silence Detector** when the human player stays muted/quiet (ISFP, loves Jjajang-ramyeon,國民 MC motif).
-- **6 Autonomous AI Idol Party Members (with Pre-Generated 4K Visual Center Portraits & Namuwiki Background Lore)**:
-  1. **Seoyoung (`서영`, `idol_wonyoung`)** — Charismatic Visual Center (`✨ Lucky Vicky`, ISTP, loves Rose Tteokbokki, fresh strawberries & Hanwoo beef; analytical framing of Quest team compositions).
-  2. **Rina (`리나`, `idol_karina`)** — Cool Tactical Leader (`🧊 Prosecutor Math`, ENFP, loves crispy Tonkatsu & Mint-Choco; tracks vote patterns and reject track math).
-  3. **Seol-ah (`설아`, `idol_sullyoon`)** — Quiet Deductive Observer (`🌊 Busan Satoori`, ISFP, loves Level 2.5 spicy Malatang & salt bread; speaks concisely in Busan dialect and catches contradictions).
-  4. **Yura (`유라`, `idol_yuna`)** — High-Energy Moodmaker (`🍑 Chungcheong Sarcasm`, ENFP, former floorball ace who loves pizza, burgers & Gukbap; uses bold intuition and Chungcheong-do roundabout sarcasm).
-  5. **Chaerin (`채린`, `idol_chaewon`)** — Sharp Prosecutor (`🔥 Fierce Street-Boss`, ISTP, "Ssam-Chaerin" who loves fire-spicy Malatang & Mint-Choco and yells `"너 도독놈이지!"` when someone fumbles).
-  6. **Hana (`하나`, `idol_hanni`)** — Clever Wildcard (`🦘 Melbourne Aussie Slang`, INFP, bread lover & ukulele songwriter; tests reactions with Melbourne Aussie slang traps).
+- **1 Non-Playing Party Moderator**: **MC Jae-ho (`유재호`, `mc_jaesuk`)** — Paces the Discord voice stage, announces Quest and Vote math, and triggers the **Bystander Silence Detector** when the human player stays muted/quiet (ISFP, 國民 MC motif).
+- **6 Autonomous AI Idol Party Members (with Pre-Generated 4K Visual Center Portraits & Avalon Deduction Lore)**:
+  1. **Seoyoung (`서영`, `idol_wonyoung`)** — Charismatic Visual Center (`✨ Lucky Vicky`, ISTP; analytical framing of Quest team compositions and proposing 1-for-1 player swaps to verify loyalty).
+  2. **Rina (`리나`, `idol_karina`)** — Cool Tactical Leader (`🧊 Prosecutor Math`, ENFP; tracks vote patterns, fail-card probabilities, and Reject Track math).
+  3. **Seol-ah (`설아`, `idol_sullyoon`)** — Quiet Deductive Observer (`🌊 Busan Satoori`, ISFP; speaks concisely in Busan dialect and catches subtle contradictions between public speeches and `APPROVE`/`REJECT` votes).
+  4. **Yura (`유라`, `idol_yuna`)** — High-Energy Moodmaker (`🍑 Chungcheong Sarcasm`, ENFP; uses bold intuition and Chungcheong-do roundabout sarcasm to break up suspicious repeat coalitions).
+  5. **Chaerin (`채린`, `idol_chaewon`)** — Sharp Prosecutor (`🔥 Fierce Street-Boss`, ISTP; aggressively cross-examines failed Quest participants and demands explicit `APPROVE`/`REJECT` declarations).
+  6. **Hana (`하나`, `idol_hanni`)** — Clever Wildcard (`🦘 Melbourne Aussie Slang`, INFP; tests reactions with sudden candidate nomination pivots and Melbourne Aussie slang).
 - **1 Human Guest (`player_human`)** — Assigned either a random role (`RANDOM`) or a judge-selected role preference while the remaining 6 roles from the official 7-player deck (`MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`) are cryptographically shuffled across the 6 AI Idols.
 
 ### Strict Information Partitioning (`buildPrivatePlayerView`)
