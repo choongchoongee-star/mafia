@@ -1138,33 +1138,28 @@ function stopActiveSpeech() {
 
 function getOrInitAvatarAnimState(id) {
   if (!state.avatarAnimStates.has(id)) {
-    state.avatarAnimStates.set(id, {
-      SmoothSpeakEnergy: 0
-    });
+    state.avatarAnimStates.set(id, {});
   }
   return state.avatarAnimStates.get(id);
 }
 
 /**
- * 60FPS Frame Loop for all 8 tiles (`mc_jaesuk` + 6 Idols + `player_human`).
+ * Frame Loop for all 8 tiles (`mc_jaesuk` + 6 Idols + `player_human`).
  */
 function startWebcamAnimationLoop() {
-  const renderFrame = (timestamp) => {
-    const t = timestamp * 0.001;
-
+  const renderFrame = () => {
     if (Date.now() > state.activeSpeechEndTime && state.activeSpeakerId) {
       clearActiveSpeakerState();
     }
 
     const allIds = ['mc_jaesuk', ...state.players.map((p) => p.id)];
-    allIds.forEach((id, idx) => {
+    allIds.forEach((id) => {
       const canvas = document.getElementById(`canvas_${id}`);
       if (!canvas) return;
       drawPhotorealisticWebcamTile(canvas, {
         id,
         isSpeaking: state.activeSpeakerId === id,
-        isHuman: id === 'player_human',
-        timeSec: t + idx * 1.43
+        isHuman: id === 'player_human'
       });
     });
 
@@ -1175,23 +1170,17 @@ function startWebcamAnimationLoop() {
 }
 
 /**
- * Renders a crisp, steady 16:9 high-resolution static studio portrait onto `canvas`:
+ * Renders a 100% static, high-resolution Discord profile image onto `canvas`:
  * - Uses the 7 photorealistic Korean K-Pop idol & MC Jae-suk portraits (`/generated/portrait_<id>.png`).
- * - Applies a clean 1.15x center crop (`fixedScale = 1.15`) with high-DPI smoothing and zero artificial warping or camera wobble.
- * - For `player_human` (when webcam is off), renders an authentic Discord voice-call avatar tile.
+ * - Applies a fixed 1.15x center crop (`fixedScale = 1.15`) with zero shaking, panning, zooming, or rotation.
+ * - For `player_human` (when webcam is off), renders a 100% static Discord voice-call avatar tile.
  */
-function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec }) {
+function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman }) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width;
   const h = canvas.height;
-  const anim = getOrInitAvatarAnimState(id);
 
   ctx.clearRect(0, 0, w, h);
-
-  const targetEnergy = isSpeaking
-    ? 0.5 + 0.5 * Math.sin(timeSec * 18) * Math.cos(timeSec * 11)
-    : 0;
-  anim.SmoothSpeakEnergy += (targetEnergy - anim.SmoothSpeakEnergy) * 0.28;
 
   // Live webcam video stream only for the human player if they enabled their camera
   if (isHuman) {
@@ -1219,7 +1208,7 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec
       drawH = w / imgRatio;
     }
 
-    // Steady 1.15x center crop to trim any edge watermarks and keep the portrait crystal clear
+    // 100% fixed static center crop — zero motion
     const fixedScale = 1.15;
     const scaledW = drawW * fixedScale;
     const scaledH = drawH * fixedScale;
@@ -1238,7 +1227,7 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec
     ctx.fillStyle = bottomGrad;
     ctx.fillRect(0, h * 0.72, w, h * 0.28);
   } else {
-    // Authentic Discord dark matte tile when camera is off (Guest tile)
+    // Authentic Discord dark matte tile when camera is off (Guest tile) — 100% static
     ctx.fillStyle = '#191b1f';
     ctx.fillRect(0, 0, w, h);
 
@@ -1249,7 +1238,7 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman, timeSec
     if (isSpeaking) {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(cx, cy, radius + 6 + anim.SmoothSpeakEnergy * 4, 0, Math.PI * 2);
+      ctx.arc(cx, cy, radius + 6, 0, Math.PI * 2);
       ctx.strokeStyle = '#23a55a';
       ctx.lineWidth = 3;
       ctx.stroke();
