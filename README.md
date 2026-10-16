@@ -40,7 +40,8 @@ Using **`gemini-4-argon`** (`thinking_level: "high"`) via the **Interactions API
 ## 3. Exact 7-Player Avalon Rules Implemented
 
 - **7 Players in `#avalon-stage-7p`**: 1 Human (`player_human`) + 6 AI Idols (`idol_wonyoung`, `idol_karina`, `idol_sullyoon`, `idol_yuna`, `idol_chaewon`, `idol_hanni`) + 1 Non-Playing Moderator (`mc_jaesuk`).
-- **Cryptographic Random Role Assignment**:
+- **Player Role Selection + Cryptographic Shuffle of Remaining 6 Roles**:
+  - The Human Player can choose any desired role (`Merlin`, `Percival`, `Loyal Servant`, `Assassin`, `Morgana`, `Oberon`) or `Random` at any time. The remaining 6 roles from the 7-player deck are cryptographically shuffled across the 6 AI Idols. Neither the player nor any AI idol knows anyone else's role outside of official Avalon Night Sight rules:
   - **Good Team (4)**: `Merlin` (sees Assassin, Morgana, Oberon), `Percival` (sees Merlin & Morgana as mystery candidates), `2x Loyal Servant of Arthur` (no night sight).
   - **Evil Team (3)**: `Assassin` (sees Morgana; chooses Merlin target if Good passes 3 Quests), `Morgana` (sees Assassin; appears to Percival as Merlin candidate), `Oberon` (blind to Evil teammates and invisible to them, visible to Merlin).
 - **Quest Team Sizes**: `Q1: 2`, `Q2: 3`, `Q3: 3`, `Q4: 4 (Requires 2 FAIL cards to fail!)`, `Q5: 4`.

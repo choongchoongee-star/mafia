@@ -1,55 +1,54 @@
-# DESIGN.md — IDOL AVALON LIVE Broadcast Studio Design System
+# DESIGN.md — IDOL AVALON LIVE: Discord Party Play Design System
 
-## 1. Visual Concept & Broadcast Aesthetic
-**IDOL AVALON LIVE** transforms the classic 7-player hidden-role social deduction game *The Resistance: Avalon* into a Korean variety show Zoom broadcast studio hosted by **MC Jae-suk** alongside **6 AI K-Pop Idols** (**Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni**) and **1 Human Guest**.
+## 1. Visual Concept & Discord Party Play Aesthetic
+**IDOL AVALON LIVE** reimagines the classic 7-player hidden-role social deduction game *The Resistance: Avalon* as a **Discord Voice & Video Party Call (`#avalon-stage-7p`)**. Instead of needing 7–10 human friends online simultaneously to start a Mafia/Avalon lobby, a solo player (or a small group of friends in future multiplayer rooms) drops into a Discord voice channel where **6 Autonomous AI K-Pop Idols** (**Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni**) and **MC Jae-suk** (`[BOT] Moderator`) fill the seats with real-time voice synthesis and epistemic hidden-role reasoning.
 
-Rather than a text-only chatbot or static character portraits, the interface is engineered as a **Live Multi-Cam Television Control Room**:
-- **Real `.mp4` Studio Webcam Feeds (`gemini-omni-1.1-flash`)**: Every AI character tile and MC Jae-suk's host monitor streams a dedicated 16:9 `.mp4` webcam video (`public/generated/webcam_*.mp4`) with a 4K studio portrait (`gemini-nano-banana-2.1`) as its poster anchor.
-- **60FPS Transparent Camera HUD Overlay (`<canvas>`)**: Layered directly above each `<video>` element (`z-index: 2`, `pointer-events: none`), a 60FPS HTML5 Canvas renders real-time broadcast camera telemetry:
-  - Dynamic autofocus face-tracking brackets (`[ AF-LOCK ]`)
-  - Real-time phoneme/viseme jaw articulation & audio dB meter (`🎙️ LIVE [A/O] -6.2dB`)
-  - Audio-reactive equalizer waveform bars
-  - Simultaneous listener reaction badges (`⚡ REACTING`, `🤨 DOUBTING`, `👍 NODDING`, `👀 WATCHING`) across non-speaking tiles while modulating the underlying `<video>` element's scale, pan, and playback rate.
+Rather than a text-only chatbot, the interface is engineered as an authentic **Discord Stage & Video Call Experience**:
+- **4K Studio Portrait Anchors (`gemini-nano-banana-2.1`) & Optional `.mp4` Cutscene Loops (`gemini-omni-1.1-flash`)**: During our hackathon sprint, we benchmarked live turn-by-turn video generation (`gemini-omni-1.1-flash`) and found that video synthesis latency could not keep up with rapid Mafia/Avalon cross-examinations. To preserve snappy conversational pacing, each Discord video tile anchors on a bespoke 4K portrait (`public/generated/portrait_*.png`) paired with a 60FPS interactive HTML5 `<canvas>` overlay and optional `.mp4` studio webcam loops (`public/generated/webcam_*.mp4`).
+- **60FPS Discord Voice-Activity & Camera HUD (`<canvas>`)**: Layered directly above each character tile (`z-index: 2`, `pointer-events: none`), a 60FPS HTML5 Canvas renders real-time voice-call presence and micro-expressions:
+  - **Discord Green Speaking Ring (`#23a55a`)**: Crisp `3px` active-speaker border and live voice-activity waveform bars driven by `gemini-3.8-flash-tts` audio amplitude.
+  - **Real-Time Phoneme/Viseme Articulation**: Dynamic jaw/lip viseme cues and audio dB telemetry (`🎙️ LIVE [A/O] -6.2dB`) synced to character speech.
+  - **Simultaneous Listener Micro-Reactions**: Non-speaking party members display live reaction pills (`⚡ REACTING`, `🤨 DOUBTING`, `👍 NODDING`, `👀 WATCHING`) during heated accusations.
 
 ---
 
-## 2. Color Palette & Atmospheric Tokens
+## 2. Color Palette & Discord Dark Mode Tokens (`public/styles.css`)
 | Token | Hex / Value | Usage |
 | :--- | :--- | :--- |
-| `--bg-studio` | `#090b12` | Deep obsidian broadcast control room background |
-| `--bg-panel` | `#111524` | Left Host Rail, Right Telemetry Rail, and Bottom Chat Dock |
-| `--bg-card` | `#161b2e` | Individual transcript cards and Judge X-Ray telemetry modules |
-| `--accent-pink` | `#ec4899` | Primary K-Pop broadcast accent, active phase badges, Wonyoung theme |
-| `--accent-indigo` | `#6366f1` | Gemini 4 Argon model badges, Night Vision callout borders, Karina theme |
-| `--accent-cyan` | `#06b6d4` | Proposed Quest Team shield borders, Sullyoon theme |
-| `--accent-gold` | `#f59e0b` | MC Jae-suk Host cue card, Quest Leader crown, Hammer warning |
-| `--accent-green` | `#10b981` | Active speaker ring-light glow, Quest Success, Approve vote, Verified badge |
-| `--accent-red` | `#f43f5e` | Quest Fail, Reject vote, Epistemic Evil tag, Assassin alert |
+| `--dc-server-rail` | `#1e1f22` | Far-left Discord Server Icon Rail (`72px`) |
+| `--dc-channel-rail` | `#2b2d31` | Left Voice Channel Sidebar (`256px`), connected member list & Secret Role DMs |
+| `--dc-user-bar` | `#232428` | Bottom-left Discord user profile & quick mic/deafen status bar |
+| `--dc-stage-bg` | `#0e0f12` | Center matte-black Discord Voice & Video Call stage background |
+| `--dc-tile-bg` | `#191b1f` | Individual 16:9 Discord video call participant tiles |
+| `--dc-chat-bg` | `#313338` | Right-hand collapsible `#stage-chat` & Judge X-Ray Inspector drawer |
+| `--dc-blurple` | `#5865f2` | Primary Discord Blurple brand accent, active pills, `@Mention` chips, primary CTAs |
+| `--dc-green` | `#23a55a` | Discord active-speaker border ring (`3px`), `APPROVE` vote, Quest `SUCCESS`, Verified pill |
+| `--dc-yellow` | `#f0b232` | Quest Leader crown, Hammer track warning (`4/5`), `Percival` candidate badge |
+| `--dc-red` | `#da373c` | Disconnect button, `REJECT` vote, Quest `FAIL`, Epistemic Evil tag, Assassin alert |
 
 ---
 
 ## 3. Typography
-- **Display & Character Headers (`--font-display`)**: `'Outfit', sans-serif` (Weights: `600`, `700`, `800`, `900`) — High-impact geometric broadcast titles and idol nameplates.
-- **UI & Dialogue Copy (`--font-sans`)**: `'Inter', sans-serif` (Weights: `400`, `500`, `600`, `700`) — Crisp readability for live subtitle bubbles and transcript logs at compact studio densities.
-- **Telemetry & Timers (`--font-mono`)**: `'JetBrains Mono', monospace` (Weights: `500`, `700`) — Phase countdown clocks (`MM:SS`), model tags (`gemini-4-argon`), thinking levels, and verification audit logs.
+- **Display & Stage Headers (`--font-display`)**: `'Outfit', 'Inter', sans-serif` (Weights: `600`, `700`, `800`) — Clean geometric channel titles (`#avalon-stage-7p`), Quest track pills, and participant nameplates.
+- **UI & Discord Chat Copy (`--font-sans`)**: `'Inter', -apple-system, BlinkMacSystemFont, sans-serif` (Weights: `400`, `500`, `600`, `700`) — Authentic Discord message rhythm in `#stage-chat` and floating call subtitles.
+- **Telemetry & Timers (`--font-mono`)**: `'JetBrains Mono', monospace` (Weights: `500`, `700`) — Phase countdown clocks (`MM:SS`), model badges (`gemini-4-argon`), thinking levels, and verification audit logs.
 
 ---
 
-## 4. Three-Column Broadcast Studio Layout (`100vh` Zero-Scroll Viewport)
-1. **Top Broadcast Header (`68px` fixed)**:
-   - Live studio indicator pill (`LIVE ZOOM STUDIO`).
-   - **5-Quest Avalon Board Track (`2 - 3 - 3 - 4* - 4`)** with explicit `2F!` indicator on Quest 4.
-   - **5-Proposal Vote Reject Track (`1..5`)** with automatic Hammer badge (`HAMMER!`).
-   - Autonomous Phase Countdown Clock (`20s` Proposal / `75s` Discussion / `15s` Vote / `15s` Quest / `30s` Assassin) + Bystander Mode detector pill.
-   - Quick-access controls for **Voice & BGM**, **Judge X-Ray**, **Interactive Architecture (`/architecture.html`)**, and **AI Studio / Key**.
-2. **Left Studio Rail (`295px`)**:
-   - **MC Jae-suk Host Monitor**: Real `.mp4` webcam feed (`webcam_mc_jaesuk.mp4`), live waveform, and National MC Cue Card commentary.
-   - **Your Secret Role Card**: Displays the human player's dealt Avalon role, alignment badge, and strict epistemic Night Vision (with one-click `👁️ Hide` privacy blur).
-   - **Role Preference & Episode Launcher**: Allows judges to play `Random Role (100% Official Rules)` or deterministically test `Merlin`, `Percival`, `Loyal Servant`, `Assassin`, `Morgana`, or `Oberon`, plus instant jump-cuts to **Quest 4 Critical** and **Final Assassin Climax**.
-3. **Center Zoom Stage (`1fr`)**:
-   - **Context-Sensitive Phase Action Banner**: Renders exact interactive buttons required for the current phase (click Zoom tiles to propose a team, vote `APPROVE`/`REJECT`, play `SUCCESS`/`FAIL` quest card, or fire the Assassin's shot).
-   - **7-Tile Zoom Conference Grid (`4x2` responsive grid)**: 6 AI Idol live `.mp4` webcam feeds + 1 Human Guest tile (with optional live browser webcam toggle `📷 Cam`).
-   - **Live Interrogation & Voice Dock**: `@Mention` target chips, bilingual Push-to-Talk microphone (`gemini-3.5-transcribe-live`), text input, and `⏭️ Stay Silent / Next Idol Turn` button.
-4. **Right Telemetry & Judge X-Ray Rail (`330px`)**:
-   - **Tab 1 — Live Transcript**: Chronological dialogue feed with model & `thinking_level` metadata and per-turn verification status.
-   - **Tab 2 — Judge X-Ray Inspector**: Real-time Epistemic & Rule Verification Loop logs, hidden vs. public `gemini-4-argon` inner monologues (`privateInnerThought` vs. `publicSpeech`), and spoiler-blurred True Roles table.
+## 4. Four-Zone Discord Party Call Layout (`100vh` Zero-Scroll Viewport)
+1. **Far-Left Server Rail (`72px`, `#1e1f22`)**:
+   - Active server icon (`IA` — **IDOL AVALON LIVE**), quick Demo Scenario jump-cut icons (**Quest 4 Critical (`2F`)**, **Assassin Climax**), Architecture viewer link (`/architecture.html`), and AI Studio / API Key modal trigger.
+2. **Left Channel Sidebar (`256px`, `#2b2d31`)**:
+   - **Active Voice Channel (`🔊 avalon-stage-7p`)**: Live connected member list (`8 / 8 Connected`) with green speaking indicators (`MC Jae-suk [BOT]`, `Wonyoung`, `Karina`, `Sullyoon`, `Yuna`, `Chaewon`, `Hanni`, `You (Guest)`).
+   - **Your Secret Role DM Card**: Displays the human player's dealt Avalon role, alignment badge, and strict epistemic Night Vision (with one-click `👁️ Hide` privacy blur).
+   - **Match Setup & Scenario Jump-Cuts**: Role selector (`Random Role (100% Official Rules)`, `Merlin`, `Percival`, `Loyal Servant`, `Assassin`, `Morgana`, `Oberon`) and instant judge scenario buttons.
+   - **Discord User Bar (`#232428`)**: Bottom status bar showing `You (Guest)` and live role status.
+3. **Center Discord Video Call Stage (`1fr`, `#0e0f12`)**:
+   - **Top Stage Header (`48px`)**: Voice channel badge (`🔊 avalon-stage-7p`), inline **5-Quest Board Pills (`Q1..Q5`)**, **Vote Reject Counter (`0/5`)**, phase timer (`01:15`), and `#stage-chat` / `X-Ray` drawer toggles.
+   - **Context-Sensitive Stage Action Banner**: Renders MC Jae-suk's live moderation prompt alongside interactive buttons for the current phase (click video tiles to propose a Quest team, vote `APPROVE`/`REJECT`, play `SUCCESS`/`FAIL` quest card, or execute the Assassin's shot).
+   - **8-Tile (`4x2`) 16:9 Video Grid**: 1 Moderator tile (**MC Jae-suk**), 6 AI Idol tiles (**Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni**), and 1 Human Guest tile (with live browser webcam toggle `📷 Cam`).
+   - **Discord Call Control Dock (`76px`)**: Circular Discord call controls (Mic Push-to-Talk via `gemini-3.5-transcribe`, Camera Toggle, Sound/BGM Toggle via `lyria-3.5`, Skip/Next Turn, New Match) plus an inline `@Mention` & quick chat bar.
+4. **Right Collapsible `#stage-chat` & Judge X-Ray Drawer (`340px`, `#313338`)**:
+   - **Tab 1 — `#stage-chat` (Transcript)**: Chronological Discord voice-channel text log with model & `thinking_level` badges and `VERIFIED`/`HEALED` epistemic status pills.
+   - **Tab 2 — `Inspector` (Judge X-Ray)**: Real-time Epistemic & Rule Verification Loop logs (`verifyAndHealUtterance`), hidden vs. public `gemini-4-argon` inner monologues (`privateInnerThought` vs. `publicSpeech`), and a spoiler-blurred True Roles table.
+
