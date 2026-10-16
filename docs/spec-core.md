@@ -1,14 +1,14 @@
-# Core Specification (`spec-core.md`) — IDOL AVALON: Live Variety Show Social Deduction
+# Core Specification (`spec-core.md`) — IDOL AVALON: Discord Party Play Social Deduction
 
 ## 1. Product Vision & Hackathon Track Alignment
-- **Title**: **IDOL AVALON: Live K-Pop Variety Show Social Deduction**
+- **Title**: **IDOL AVALON: Live Discord Party Play Social Deduction**
 - **Track**: **Track 1 — Gemini 4 Argon in Entertainment**
-- **Core Concept**: A single-player, live-generated social deduction game following the **exact 7-player rules of *The Resistance: Avalon***, staged as a high-energy **K-Pop Idol Variety Show Zoom Call**.
+- **Core Concept**: An on-demand, live-generated social deduction party game following the **exact 7-player rules of *The Resistance: Avalon***, staged inside a **Discord Voice & Video Party Channel (`#avalon-stage-7p`)**.
 - **Cast**:
-  - **1 Non-Playing Variety Show Host (진행자)**: **MC Jae-suk** (inspired by National MC Yoo Jae-suk — signature glasses, sharp suit, cue cards, witty and energetic variety host who runs the game clock, announces phases/votes/quests, and roasts silent bystanders).
-  - **6 Photorealistic AI K-Pop Girl Group Idols**: **Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni** (all-star visual & personality line-up with realistic webcam feeds, live LLM reasoning, live voice speech, and generative video reactions).
-  - **1 Human Player ("Guest / 7th Member")**: Joins via text chat or live voice microphone (or can choose to stay completely silent as a bystander while the AI idols autonomously run and play the entire game).
-- **Language Policy**: **100% English** for all UI labels, game system logs, subtitles, MC commentary, and Idol dialogue/speech (with natural K-Pop variety flavor such as *"Oppa/Unnie"*, *"Daebak"*, *"Sunbaenim"*). Accepts user input in English or any language and responds in English.
+  - **1 Non-Playing Party Moderator (진행자)**: **MC Jae-suk** (inspired by National MC Yoo Jae-suk — signature glasses, sharp suit, witty and energetic moderator who runs the Discord stage clock, announces phases/votes/quests, and calls out muted/silent bystanders).
+  - **6 Photorealistic AI K-Pop Girl Group Idols**: **Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni** (all-star visual & personality line-up connected to the Discord voice/video stage with live LLM reasoning, live voice speech, and speaking-ring feedback).
+  - **1 Human Player ("Guest / 7th Member")**: Joins the Discord voice/video channel via text chat or live voice microphone (or can stay muted/silent as a bystander while the AI idols autonomously run and play the entire game).
+- **Language Policy**: **100% English** for all UI labels, game system logs, subtitles, MC commentary, and Idol dialogue/speech (with natural K-Pop flavor such as *"Oppa/Unnie"*, *"Daebak"*, *"Sunbaenim"*). Accepts user input in English or Korean and responds in English.
 
 ---
 
@@ -104,10 +104,10 @@ stateDiagram-v2
 
 ### 4.1 Phase Timer Rules & Autonomous Fallbacks
 1. **Night Phase & Role Reveal (`10 seconds`)**:
-   - **MC Jae-suk** introduces the show and triggers the secret role reveal overlay for the Human Player (showing the Human's random role and exact night-phase knowledge, e.g., if Percival, highlights the 2 Merlin/Morgana candidates on the Zoom grid).
+   - **MC Jae-suk** introduces the session in `#avalon-stage-7p` and triggers the secret role reveal card in the Discord sidebar for the Human Player (showing the Human's random role and exact night-phase knowledge, e.g., if Percival, highlights the 2 Merlin/Morgana candidates on the Discord stage grid).
 2. **Team Proposal Phase (`20 seconds`)**:
    - **If an AI Idol is Leader**: `gemini-4-argon` selects the optimal `N`-player team based on her private role view and Bayesian suspicion matrix within ~3–5 seconds and announces her proposal.
-   - **If the Human Player is Leader**: The Human has **20 seconds** to toggle `N` players on the Zoom grid and click **"Propose Team"**. If the 20s timer expires without submission, **MC Jae-suk** playfully intervenes (*"Time's up, Guest-nim! Let's lock in a balanced squad!"*) and auto-fills the remaining slots so the game never stalls.
+   - **If the Human Player is Leader**: The Human has **20 seconds** to toggle `N` players on the Discord stage grid and click **"Propose Team"**. If the 20s timer expires without submission, **MC Jae-suk** playfully intervenes (*"Time's up, Guest-nim! Let's lock in a balanced squad!"*) and auto-fills the remaining slots so the game never stalls.
 3. **Discussion & Live Debate Phase (`75 seconds` — Option A Spotlight + Free Interrupt)**:
    - **Autonomous Multi-Agent Turn Scheduler**:
      - Every ~8–12 seconds during the 75-second window, the **Floor Manager (`gemini-4-argon`)** selects the next idol who has the strongest strategic reason to speak (e.g., the Leader defending her pick, an idol left off the team objecting, a player accused in the previous turn counter-attacking, or Merlin subtly steering the table).
@@ -121,7 +121,7 @@ stateDiagram-v2
 4. **Team Vote Phase (`15 seconds`)**:
    - All 6 AI Idols compute their `APPROVE` or `REJECT` vote in parallel via `gemini-3.8-flash` / `gemini-4-argon` (along with a 1-sentence reason and hidden inner monologue).
    - The Human has **15 seconds** to click **`APPROVE (⭕)`** or **`REJECT (❌)`**. If the Human is inactive when the 15s timer expires, an automatic `APPROVE` (if on the team) or `REJECT` (if off the team) is cast so the reveal proceeds immediately.
-   - All 7 votes flip simultaneously on the Zoom tiles!
+   - All 7 votes flip simultaneously on the Discord stage tiles!
 5. **Quest Execution Phase (`15 seconds`)**:
    - Only the `N` approved team members act.
    - AI Idols on the team secretly submit `SUCCESS` or `FAIL` based on their alignment and `gemini-4-argon` tactical decision (e.g., an Evil idol might play `SUCCESS` on a 2-player Quest 1 to gain trust, or `FAIL` on Quest 3 to take the lead).
@@ -131,17 +131,17 @@ stateDiagram-v2
 
 ## 5. Multimodal Video, Voice & Verification Architecture
 
-### 5.1 Live Idol Webcam Video & Speech Generation Pipeline
+### 5.1 Live Idol Discord Stage Video & Speech Generation Pipeline
 1. **Real Looping Webcam Video Streams (`gemini-omni-1.1-flash`)**:
-   - Generates real 16:9 `.mp4` broadcast studio webcam videos (`output_video.data` via Interactions API `background=True`) for **MC Jae-suk** and all **6 Idols** (`webcam_<characterId>.mp4`), playing continuously inside `<video autoplay loop muted playsinline>` elements in every Zoom tile.
-   - Triggered with `background=True` for both pre-warmed studio webcam loops and live turn reactions (Leader Proposal speech, Accusation Spotlight, Quest Reveal reaction, Assassin Final Shot).
+   - Generates real 16:9 `.mp4` webcam videos (`output_video.data` via Interactions API `background=True`) for **MC Jae-suk** and all **6 Idols** (`webcam_<characterId>.mp4`), playing inside `<video autoplay loop muted playsinline>` elements in the Discord stage tiles.
+   - Triggered with `background=True` for asynchronous reaction clips on high-drama beats.
 2. **Photorealistic Visual Anchor (`gemini-nano-banana-2.1` / `gemini-3.1-flash-lite-image`)**:
-   - Generates high-resolution 4K studio webcam poster frames (`portrait_<characterId>.png`) cached locally on disk (`/public/generated/`) for instant 0ms poster display while video streams initialize.
-3. **Expressive Real-Time Speech (`gemini-3.8-flash-tts`) + Audio-Reactive Webcam Engine**:
+   - Generates high-resolution 4K studio webcam poster frames (`portrait_<characterId>.png`) cached locally on disk (`/public/generated/`) for instant 0ms display in every Discord video tile.
+3. **Expressive Real-Time Speech (`gemini-3.8-flash-tts`) + Discord Speaking-Ring Engine**:
    - Every spoken line is synthesized with member-specific voice profiles via `gemini-3.8-flash-tts` (`gemini-3.8-flash-lite-tts` for ultra-low latency).
-   - Simultaneously drives audio-reactive camera motion, speaking border glow, live voice waveform overlays, and HUD telemetry over the live `<video>` webcam stream.
+   - Simultaneously drives Discord green speaking-ring borders, voice channel member indicators, and live voice waveform overlays.
 4. **Adaptive Soundtrack (`lyria-3.5` / `lyria-3-clip-preview`)**:
-   - Generates dynamic background music loops matching the game tension (Upbeat K-Pop Variety Show BGM $\rightarrow$ Tense Social Deduction Interrogation $\rightarrow$ High-Stakes Assassin Climax).
+   - Generates dynamic background music loops matching the game tension across `DISCUSSION`, `TEAM_VOTE`, `QUEST_EXECUTION`, and `ASSASSIN_PHASE`.
 
 ### 5.2 Autonomous Rule & Epistemic Verification Loop (Hackathon Judge Requirement)
 Every AI Idol turn passes through a **2-Stage Verification Loop** before reaching the player:
@@ -152,37 +152,37 @@ Every AI Idol turn passes through a **2-Stage Verification Loop** before reachin
 ---
 
 ## 6. UI/UX Layout & Hackathon Judging Features
-1. **Zoom / Broadcast Studio Grid**:
-   - **Top Broadcast Bar**: Current Quest (`1–5`), Team Size (`2-3-3-4*-4`), Vote Reject Track (`1/5` to `5/5`), Phase Name, and **Live Countdown Timer** + **"Call Vote Now"** button.
-   - **Main Video Grid**:
-     - **MC Jae-suk Host Tile** + **6 Photorealistic Idol Video Tiles** + **Human Player Tile**.
-     - Each tile shows: Member Name, Leader Crown (`👑`), Proposed Team Shield (`🛡️`), Live Speaking Waveform, Last Vote Badge (`⭕ APPROVE` / `❌ REJECT`), and Private Night Knowledge indicator (only visible for roles the Human is allowed to see!).
-   - **Interactive Bottom Dock**:
-     - Push-to-Talk Live Microphone button (`gemini-3.5-transcribe-live` / Web Speech) + English Text Input bar + Quick Target `@Mention` chips (`@Wonyoung`, `@Karina`, `@Sullyoon`, `@Yuna`, `@Chaewon`, `@Hanni`).
-2. **Judge / Director X-Ray Drawer (Toggleable for Hackathon Demo)**:
+1. **Discord Voice & Video Stage UI (`#avalon-stage-7p`)**:
+   - **Left Server Rail & Channel Sidebar**: Discord server icon rail, active `#avalon-stage-7p` voice channel with live connected members list, Quest Track (`1–5`), Reject Count (`1/5` to `5/5`), Secret Role Card, and bottom Discord User Control Bar (Mic/Deafen/Settings).
+   - **Center Discord Video Stage Grid**:
+     - **MC Jae-suk Moderator Tile** + **6 Photorealistic Idol Video Tiles** + **Human Player Tile** + **Bottom Voice Stage Action Bar**.
+     - Each tile shows: Member Name, Leader Crown (`👑`), Proposed Team Shield (`🛡️`), Discord Green Speaking Ring, Last Vote Badge (`⭕ APPROVE` / `❌ REJECT`), and Private Night Knowledge indicator (only visible for roles the Human is allowed to see!).
+   - **Right Party Chat & Judge X-Ray Panel**:
+     - Tabbed Discord `#stage-chat` transcript + `@Mention` quick chips + Push-to-Talk Live Microphone button (`gemini-3.5-transcribe`) + English/Korean Text Input bar.
+2. **Judge / Director X-Ray Tab (Toggleable for Hackathon Demo)**:
    - Displays live **`gemini-4-argon` (`thinking_level`)** reasoning traces, the hidden **Bayesian Suspicion Matrix**, each AI idol's **Private Inner Monologue** vs **Public Speech**, and **Verification Loop Pass/Self-Heal Logs** so judges can verify in < 3 minutes that all 6 AI idols are running genuine, deep multi-agent social deduction.
-   - Includes a **"Fast-Forward Timer / Next Beat"** control for live judging so a full multi-quest demonstration fits smoothly inside the 3-minute judging window.
+   - Includes a **"Next Beat"** control for live judging so a full multi-quest demonstration fits smoothly inside the 3-minute judging window.
 
 ---
 
 ## 7. Core Problem Statement, Engineering Retrospective & Future Product Roadmap
 
 ### 7.1 Core Problem & Purpose: Solving the "Headcount Bottleneck" of Social Deduction Games
-- **The Fundamental Pain Point of Mafia / Avalon**: Social deduction games (*Mafia*, *Werewolf*, *The Resistance: Avalon*) are among the most thrilling party games ever created, yet they suffer from a massive **cold-start matchmaking barrier**: they strictly require **7 to 10 live players** gathered at the exact same time to achieve proper game-theoretic balance.
+- **The Fundamental Pain Point of Mafia / Avalon**: Social deduction games (*Mafia*, *Werewolf*, *The Resistance: Avalon*) are among the most thrilling party games ever created, yet they suffer from a massive **cold-start matchmaking barrier**: they strictly require **7 to 10 live players** gathered in a Discord voice channel at the exact same time to achieve proper game-theoretic balance.
 - **Why Traditional Game AI Failed**: Unlike Chess or MOBA bots, social deduction cannot be solved with simple heuristics—it requires open-ended natural language persuasion, bluffing, reading contradictions, and reasoning strictly under asymmetric hidden information (*Epistemic Isolation*).
-- **How `gemini-4-argon` Solves It**: By combining `gemini-4-argon`'s frontier reasoning (`thinking_level: "high"`) with strict per-agent epistemic state isolation and an autonomous verification gate, a player can launch an authentic 7-player Avalon match anytime with zero matchmaking wait.
+- **How `gemini-4-argon` Solves It**: By combining `gemini-4-argon`'s frontier reasoning (`thinking_level: "high"`) with strict per-agent epistemic state isolation and an autonomous verification gate, a player can launch an authentic 7-player Avalon match in a Discord-style party room anytime with zero matchmaking wait.
 
 ### 7.2 Hackathon Engineering Retrospective: Real-Time Generative Video Latency vs. Conversational Pacing
 - **Experiment During the Sprint**: Early in the hackathon, we tested generating live turn-by-turn reaction videos via `gemini-omni-1.1-flash` for every idol utterance.
 - **Key Finding (Latency vs. Pacing Trade-off)**: While asynchronous video generation produces rich clips, current end-to-end video generation latency is still too slow to keep pace with rapid-fire, interactive Mafia/Avalon debate turns. Waiting for full video generation on every turn broke conversational momentum.
-- **Pragmatic Hackathon Solution**: We prioritized snappy, uninterrupted conversational pacing by anchoring each Zoom tile with high-resolution studio portraits (`gemini-nano-banana-2.1`) paired with real-time expressive voice synthesis (`gemini-3.8-flash-tts`) and client-side audio-reactive webcam motion, while running `gemini-omni-1.1-flash` asynchronously in the background (`background=True`).
+- **Pragmatic Hackathon Solution**: We prioritized snappy, uninterrupted conversational pacing by anchoring each Discord stage tile with high-resolution portraits (`gemini-nano-banana-2.1`) paired with real-time expressive voice synthesis (`gemini-3.8-flash-tts`) and Discord speaking-ring / audio-reactive indicators, while running `gemini-omni-1.1-flash` asynchronously in the background (`background=True`).
 
 ### 7.3 Post-Hackathon Product Roadmap
-1. **Hybrid Human + AI Party Matchmaking (`N` Friends + `7 - N` AI Agents)**:
-   - Expand beyond the 1-Human + 6-AI single-player mode into **Drop-In Multiplayer Rooms**.
-   - If 3 or 4 friends want to play Mafia/Avalon together but lack the full 7–10 headcount, the system dynamically fills **only the missing seats** with autonomous `gemini-4-argon` agents so any small friend group can play a full-scale match immediately.
+1. **Hybrid Discord Party Multiplayer (`N` Friends + `7 - N` AI Agents)**:
+   - Expand beyond the 1-Human + 6-AI single-player mode into **Drop-In Discord Multiplayer Lobbies**.
+   - If 3 or 4 friends gather on Discord to play Mafia/Avalon together but lack the full 7–10 headcount, the system dynamically fills **only the missing seats** with autonomous `gemini-4-argon` agents so any small friend group can play a full-scale match immediately.
 2. **Customizable NPC Persona & IP Universe Packs**:
    - Allow players to swap or mix NPC rosters on demand based on personal taste: **K-Pop Boy Group Idols**, **Anime / Webtoon Characters**, **Noir Movie Detectives & Villains**, or custom user-created characters—dynamically pairing `gemini-nano-banana-2.1` visual generation with `gemini-3.8-flash-tts` voice profiles.
 3. **Sub-Second Real-Time Streaming Video Avatars (Micro-Expressions & Tells)**:
-   - As real-time generative video models achieve sub-second streaming latency, upgrade the static studio portraits into **live streaming neural video avatars** capable of subtle psychological "tells" (nervous eye darts when bluffing as Morgana, micro-smirks, shocked gasps on Quest betrayals) synchronized in real time with dialogue.
+   - As real-time generative video models achieve sub-second streaming latency, upgrade the static portraits in the Discord video tiles into **live streaming neural video avatars** capable of subtle psychological "tells" (nervous eye darts when bluffing as Morgana, micro-smirks, shocked gasps on Quest betrayals) synchronized in real time with dialogue.
 

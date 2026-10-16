@@ -1,8 +1,8 @@
-# API & Architecture Specification (`spec-api.md`) — IDOL AVALON
+# API & Architecture Specification (`spec-api.md`) — IDOL AVALON (Discord Party Play)
 
 ## 1. System Architecture Overview
 - **Runtime Stack**:
-  - **Backend + Frontend Unified Server**: Node.js (`v24+`) + Express + TypeScript/ES Modules (`@google/genai >= 2.3.0`) serving a responsive, broadcast-grade Single Page Application (Three.js + WebGL/Canvas 2.5D Photorealistic Webcam Renderer + Web Audio API + SSE/REST real-time state engine).
+  - **Backend + Frontend Unified Server**: Node.js (`v24+`) + Express + ES Modules (`@google/genai >= 2.3.0`) serving a responsive **Discord Voice & Video Stage (`#avalon-stage-7p`)** Single Page Application (WebGL/Canvas Photorealistic Stage Renderer + Web Audio API + REST real-time state engine).
   - **Cloud Target**: Containerized (`Dockerfile` on port `8080`) and deployed directly to **Google Cloud Run** via the `cloudrun` MCP service.
 - **Environment Variables**:
   - `GEMINI_API_KEY`: Injected via `.env` locally and Cloud Run environment variables in production (never hardcoded in source code).
@@ -21,15 +21,15 @@ All calls use `@google/genai` (`>= 2.3.0`) targeting the **Interactions API** (`
 ### 2.1 Model Assignment Matrix
 | Subsystem | Primary Model ID | Fallback / Lite ID | `thinking_level` | Purpose |
 | :--- | :--- | :--- | :---: | :--- |
-| **Game Master & Showrunner (`MC Jae-suk` + Floor Manager)** | `gemini-4-argon` | `gemini-3.8-flash` | `"medium"` | Selects next speaker in discussion, detects silent bystander behavior, generates MC Jae-suk broadcast commentary, and summarizes quest math. |
+| **Game Master & Discord Stage Moderator (`MC Jae-suk` + Floor Manager)** | `gemini-4-argon` | `gemini-3.8-flash` | `"medium"` | Selects next speaker in the Discord voice channel, detects silent bystander behavior, generates MC Jae-suk moderator commentary, and summarizes quest math. |
 | **Deep Strategic Action (Team Proposal, Quest Play, Assassin Shot, Merlin Guidance)** | `gemini-4-argon` | `gemini-3.8-flash` | `"high"` | Computes Bayesian suspicion updates, proposes optimal `N`-player teams, decides `SUCCESS`/`FAIL` quest plays, and executes the Assassin's final Merlin deduction. |
 | **Autonomous Verification Loop (Epistemic & Rule Guard)** | `gemini-4-argon` | `gemini-3.5-flash-lite` | `"low"` | Verifies every AI idol utterance before TTS/video output to ensure zero illegal role leaks, accurate vote history references, and strict English output. |
 | **Parallel Idol Voting & Fast Debate Turns** | `gemini-3.8-flash` | `gemini-3.5-flash-lite` | N/A | Executes simultaneous 6-idol `APPROVE`/`REJECT` vote reasoning and rapid rebuttal turns during the 75s discussion timer. |
-| **Photorealistic Idol & MC Portraits** | `gemini-nano-banana-2.1` | `gemini-3.1-flash-lite-image` | N/A | Generates photorealistic K-Pop webcam portraits (`Wonyoung`, `Karina`, `Sullyoon`, `Yuna`, `Chaewon`, `Hanni`, `MC Jae-suk`) with studio lighting and emotional states. |
+| **Photorealistic Idol & MC Stage Portraits** | `gemini-nano-banana-2.1` | `gemini-3.1-flash-lite-image` | N/A | Generates photorealistic Discord video tile portraits (`Wonyoung`, `Karina`, `Sullyoon`, `Yuna`, `Chaewon`, `Hanni`, `MC Jae-suk`) with studio lighting. |
 | **Live Talking / Reaction Video Clips** | `gemini-omni-1.1-flash` | Canvas WebGL 2.5D Live Motion | N/A | Background-generates (`background: true`) short photorealistic video clips synchronized with idol speech/reactions. |
 | **Expressive Idol & MC Voice Synthesis** | `gemini-3.8-flash-tts` | `gemini-3.8-flash-lite-tts` | N/A | Synthesizes distinct English voices for MC Jae-suk and each of the 6 K-Pop idols. |
 | **Live Voice Input Transcription** | `gemini-3.5-transcribe` | `gemini-3.5-transcribe-live` / `gemini-3.8-flash` / Web Speech | N/A | Captures real microphone audio via `MediaRecorder` (`audio/webm` / `audio/mp4`) and transcribes Korean or English speech into Avalon dialogue via `audioTranscription.text`. |
-| **Adaptive Variety / Mafia BGM Loops** | `lyria-3-clip-preview` | `lyria-3.5` | N/A | Generates and caches phase-adaptive 30s MP3 background music loops (`discussion`, `vote`, `quest`, `assassin`) via `@google/genai` `models.generateContent`. |
+| **Adaptive Discord Party BGM Loops** | `lyria-3-clip-preview` | `lyria-3.5` | N/A | Generates and caches phase-adaptive 30s MP3 background music loops (`discussion`, `vote`, `quest`, `assassin`) via `@google/genai` `models.generateContent`. |
 
 ---
 
