@@ -1,20 +1,29 @@
 :root {
-  --bg-studio: #090b12;
-  --bg-panel: #111524;
-  --bg-card: #161b2e;
-  --bg-card-hover: #1e253e;
-  --border-subtle: rgba(255, 255, 255, 0.09);
-  --border-active: #ec4899;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --accent-pink: #ec4899;
-  --accent-indigo: #6366f1;
-  --accent-cyan: #06b6d4;
-  --accent-gold: #f59e0b;
-  --accent-green: #10b981;
-  --accent-red: #f43f5e;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-display: 'Outfit', sans-serif;
+  --bg-server-rail: #1e1f22;
+  --bg-sidebar: #2b2d31;
+  --bg-sidebar-alt: #232428;
+  --bg-chat: #313338;
+  --bg-input: #383a40;
+  --bg-stage: #0e0f12;
+  --bg-tile: #191b1f;
+  --bg-pill: rgba(15, 16, 19, 0.78);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.14);
+
+  --discord-blurple: #5865f2;
+  --discord-blurple-hover: #4752c4;
+  --discord-green: #23a55a;
+  --discord-green-hover: #1a8647;
+  --discord-red: #da373c;
+  --discord-red-hover: #b8282c;
+  --discord-yellow: #f0b232;
+
+  --text-normal: #f2f3f5;
+  --text-secondary: #dbdee1;
+  --text-muted: #949ba4;
+  --text-faint: #6d6f78;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
@@ -24,626 +33,769 @@
   padding: 0;
 }
 
-body {
-  background: radial-gradient(circle at 20% 0%, #171c36 0%, #090b12 65%);
-  color: var(--text-main);
-  font-family: var(--font-sans);
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+/* Custom sleek dark scrollbars (no white browser scrollbars) */
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #1a1b1e;
+  border-radius: 4px;
 }
 
-/* Broadcast Header */
-.broadcast-header {
-  height: 68px;
-  background: rgba(13, 17, 30, 0.92);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 0 18px;
+body {
+  background: var(--bg-stage);
+  color: var(--text-normal);
+  font-family: var(--font-sans);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+/* Main Discord Shell Layout */
+.discord-app {
+  display: grid;
+  grid-template-columns: 64px 244px 1fr 324px;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.discord-app.chat-collapsed {
+  grid-template-columns: 64px 244px 1fr;
+}
+
+.discord-app.chat-collapsed .chat-drawer {
+  display: none;
+}
+
+/* =========================================================================
+   1. FAR-LEFT DISCORD SERVER ICON RAIL (64px)
+   ========================================================================= */
+.server-rail {
+  background: var(--bg-server-rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+  user-select: none;
+  z-index: 10;
+}
+
+.server-icon {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #313338;
+  color: var(--text-secondary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-radius 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.server-icon:hover,
+.server-icon.active {
+  border-radius: 14px;
+  background: var(--discord-blurple);
+  color: #fff;
+}
+
+.server-icon .server-pill {
+  position: absolute;
+  left: -10px;
+  width: 4px;
+  height: 34px;
+  border-radius: 0 4px 4px 0;
+  background: #fff;
+}
+
+.rail-divider {
+  width: 28px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 1px;
+  margin: 2px 0;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-text-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* =========================================================================
+   2. LEFT DISCORD CHANNEL & GAME STATE SIDEBAR (244px)
+   ========================================================================= */
+.channel-sidebar {
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  border-right: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.server-header {
+  height: 48px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.28);
   flex-shrink: 0;
 }
 
-.brand-cluster {
+.server-name-wrap {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 7px;
 }
 
-.live-pill {
-  background: rgba(244, 63, 94, 0.18);
-  border: 1px solid rgba(244, 63, 94, 0.55);
-  color: #fda4af;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 999px;
+.server-verified {
   display: flex;
   align-items: center;
-  gap: 6px;
 }
 
-.live-dot {
-  width: 8px;
-  height: 8px;
-  background: #f43f5e;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #f43f5e;
-  animation: pulseDot 1.3s infinite ease-in-out;
+.server-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-@keyframes pulseDot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.35); opacity: 0.55; }
-}
-
-.title-block h1 {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
   display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.accent-badge {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-indigo));
-  padding: 2px 7px;
-  border-radius: 6px;
-  font-weight: 700;
-}
-
-.subtitle {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* Avalon Board Strip */
-.avalon-board-strip {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: rgba(22, 27, 46, 0.85);
-  border: 1px solid var(--border-subtle);
-  padding: 6px 14px;
-  border-radius: 12px;
-}
-
-.board-section {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 10px;
 }
 
-.board-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
+.channel-category {
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.04em;
+  padding: 4px 8px 0 8px;
 }
 
-.board-divider {
-  width: 1px;
-  height: 30px;
-  background: var(--border-subtle);
-}
-
-.quest-nodes, .reject-nodes {
+.voice-channel-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-normal);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.voice-channel-item .ch-icon {
+  color: var(--discord-green);
+  flex-shrink: 0;
+}
+
+.voice-channel-item .ch-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ch-live-badge {
+  background: var(--discord-red);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+}
+
+/* Connected Voice Members under #avalon-stage-7p */
+.voice-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 18px;
+}
+
+.voice-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.voice-member-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-normal);
+}
+
+.voice-member-row.speaking {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+.vm-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #1e1f22;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+}
+
+.voice-member-row.speaking .vm-avatar {
+  border-color: var(--discord-green);
+}
+
+.vm-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vm-tag {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+/* Sidebar Widgets (Quest Board & Secret Role) */
+.sidebar-section {
+  background: #232428;
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  margin-bottom: 7px;
+}
+
+.muted-label {
+  font-weight: 500;
+  color: var(--text-faint);
+}
+
+.hammer-badge {
+  background: var(--discord-red);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+}
+
+.quest-track-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
 }
 
 .quest-node {
-  min-width: 52px;
   height: 36px;
-  border-radius: 8px;
-  background: #1e2640;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  padding: 2px 6px;
-  position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .quest-node .q-title {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
 }
 
 .quest-node .q-sub {
   font-size: 9px;
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
 
 .quest-node.active {
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.16);
+  border-color: var(--discord-yellow);
+  background: rgba(240, 178, 50, 0.12);
+}
+
+.quest-node.active .q-title {
+  color: var(--discord-yellow);
 }
 
 .quest-node.success {
-  background: rgba(16, 185, 129, 0.24);
-  border-color: var(--accent-green);
-  color: #6ee7b7;
+  background: rgba(35, 165, 90, 0.2);
+  border-color: var(--discord-green);
+}
+
+.quest-node.success .q-title {
+  color: #4ade80;
 }
 
 .quest-node.fail {
-  background: rgba(244, 63, 94, 0.26);
-  border-color: var(--accent-red);
-  color: #fda4af;
+  background: rgba(218, 55, 60, 0.22);
+  border-color: var(--discord-red);
+}
+
+.quest-node.fail .q-title {
+  color: #f87171;
+}
+
+.reject-track-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .reject-dot {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #1e2640;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex: 1;
+  height: 20px;
+  border-radius: 4px;
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-faint);
 }
 
 .reject-dot.filled {
-  background: rgba(245, 158, 11, 0.25);
-  border-color: var(--accent-gold);
-  color: #fcd34d;
+  background: rgba(240, 178, 50, 0.22);
+  border-color: var(--discord-yellow);
+  color: var(--discord-yellow);
 }
 
 .reject-dot.hammer-slot.filled {
-  background: rgba(244, 63, 94, 0.35);
-  border-color: var(--accent-red);
+  background: rgba(218, 55, 60, 0.28);
+  border-color: var(--discord-red);
   color: #fff;
 }
 
-.hammer-tag {
-  background: var(--accent-red);
-  color: #fff;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 9px;
-}
-
-/* Header Controls & Timer */
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.phase-clock-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(22, 27, 46, 0.95);
-  border: 1px solid rgba(99, 102, 241, 0.45);
-  padding: 5px 12px;
-  border-radius: 10px;
-}
-
-.phase-clock-card.urgent {
-  border-color: var(--accent-red);
-  box-shadow: 0 0 14px rgba(244, 63, 94, 0.4);
-}
-
-.phase-meta {
-  display: flex;
-  flex-direction: column;
-}
-
-.phase-name {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  color: #a5b4fc;
-}
-
-.bystander-pill {
-  font-size: 9px;
-  font-family: var(--font-mono);
-  color: #fcd34d;
-}
-
-.timer-display {
-  font-family: var(--font-mono);
-  font-size: 20px;
-  font-weight: 800;
-  color: #fff;
-}
-
-.action-buttons-group {
-  display: flex;
-  gap: 6px;
-}
-
-.icon-btn {
-  background: #1c2238;
-  color: var(--text-main);
-  border: 1px solid var(--border-subtle);
-  padding: 7px 11px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.icon-btn:hover {
-  background: #27304d;
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.icon-btn.active {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: var(--accent-green);
-  color: #6ee7b7;
-}
-
-.icon-btn.xray-btn {
-  background: rgba(99, 102, 241, 0.18);
-  border-color: rgba(99, 102, 241, 0.45);
-  color: #c7d2fe;
-}
-
-/* Main 3-Column Studio Workspace */
-.studio-workspace {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 295px 1fr 330px;
-  gap: 12px;
-  padding: 12px;
-  overflow: hidden;
-}
-
-/* Left Rail: MC Jae-suk + Secret Role Card + Scenarios */
-.left-studio-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-}
-
-.mc-host-card, .secret-role-card, .scenario-card {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  padding: 10px;
-}
-
-.mc-host-card.speaking-active {
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 18px rgba(245, 158, 11, 0.28);
-}
-
-.mc-video-wrapper {
-  position: relative;
-  width: 100%;
-  height: 148px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #0d111e;
-}
-
-.webcam-canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.webcam-hud-top {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  right: 7px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  pointer-events: none;
-}
-
-.mc-tag {
-  background: rgba(15, 23, 42, 0.82);
-  border: 1px solid rgba(245, 158, 11, 0.55);
-  color: #fcd34d;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 6px;
-}
-
-.model-tag {
-  background: rgba(99, 102, 241, 0.85);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 5px;
-}
-
-.mc-cue-card {
-  margin-top: 8px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 9px;
-  padding: 8px 10px;
-}
-
-.cue-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.cue-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 800;
-  color: #fbbf24;
-}
-
-.thinking-pill {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: #93c5fd;
-}
-
-.mc-speech-text {
-  font-size: 12px;
-  line-height: 1.4;
-  color: #fef3c7;
+/* Secret Role Widget */
+.text-link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
   font-weight: 500;
+  cursor: pointer;
 }
 
-/* Secret Role Card */
-.role-card-header {
+.text-link-btn:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
+
+.role-widget-body {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 6px;
-}
-
-.section-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-}
-
-.role-title {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 800;
-  color: #fff;
-}
-
-.alignment-pill {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.alignment-pill.good {
-  background: rgba(16, 185, 129, 0.2);
-  border: 1px solid var(--accent-green);
-  color: #6ee7b7;
-}
-
-.alignment-pill.evil {
-  background: rgba(244, 63, 94, 0.22);
-  border: 1px solid var(--accent-red);
-  color: #fda4af;
-}
-
-.night-vision-box {
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: #e2e8f0;
-  background: rgba(15, 23, 42, 0.65);
-  border-left: 3px solid var(--accent-indigo);
-  padding: 7px 9px;
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.rules-mini-reminder {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  line-height: 1.35;
+  flex-direction: column;
+  gap: 6px;
+  transition: filter 0.15s ease;
 }
 
 .role-masked {
-  filter: blur(8px);
+  filter: blur(7px);
   user-select: none;
 }
 
-.scenario-buttons {
+.role-top-line {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  margin-top: 6px;
 }
 
-.scenario-btn {
+.role-name-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.role-team-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.role-team-tag.good {
+  background: rgba(35, 165, 90, 0.18);
+  color: #4ade80;
+}
+
+.role-team-tag.evil {
+  background: rgba(218, 55, 60, 0.2);
+  color: #f87171;
+}
+
+.role-vision-text {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: #1e1f22;
+  padding: 7px 8px;
+  border-radius: 5px;
+}
+
+/* Stage Presets */
+.preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.preset-item {
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #1c233a;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-main);
-  font-size: 11.5px;
-  font-weight: 600;
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  padding: 6px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-.scenario-btn:hover {
-  background: #263050;
-  border-color: rgba(255, 255, 255, 0.25);
+.preset-item:hover {
+  background: #35373c;
+  color: #fff;
 }
 
-.scenario-btn.primary {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(99, 102, 241, 0.25));
-  border-color: rgba(236, 72, 153, 0.5);
+/* Voice Connection & User Profile Footer */
+.voice-connection-bar {
+  background: #232428;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.scenario-btn.danger {
-  background: rgba(244, 63, 94, 0.16);
-  border-color: rgba(244, 63, 94, 0.45);
+.vc-signal-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* Center Stage: Phase Action Banner + 7-Tile Zoom Grid + Live Chat Dock */
-.center-zoom-stage {
+.vc-connected-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--discord-green);
+}
+
+.vc-subtext {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.user-profile-bar {
+  height: 52px;
+  background: #1e1f22;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.user-avatar-wrap {
+  position: relative;
+}
+
+.user-avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--discord-blurple);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-online-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--discord-green);
+  border: 2px solid #1e1f22;
+}
+
+.user-meta {
   display: flex;
   flex-direction: column;
-  gap: 10px;
   overflow: hidden;
 }
 
-.phase-action-banner {
-  background: linear-gradient(90deg, rgba(22, 27, 46, 0.96), rgba(30, 27, 60, 0.96));
-  border: 1px solid rgba(236, 72, 153, 0.4);
-  border-radius: 12px;
-  padding: 9px 14px;
+.user-display-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.user-sub-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   3. CENTER DISCORD VIDEO CALL STAGE (Full-Bleed Dark Matte Stage)
+   ========================================================================= */
+.video-call-stage {
+  background: var(--bg-stage);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px 18px;
+  gap: 12px;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Top Floating Pill & Context Action Bar */
+.stage-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 52px;
+  flex-shrink: 0;
+  min-height: 40px;
 }
 
-.banner-left {
-  display: flex;
+.meeting-info-pill {
+  background: #1b1c20;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 7px 15px;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-}
-
-.banner-badge {
-  background: var(--accent-pink);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 9px;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-
-.banner-instruction {
   font-size: 13px;
-  font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-normal);
+  flex-shrink: 0;
 }
 
-.banner-controls {
+.meeting-info-pill.urgent {
+  border-color: var(--discord-red);
+}
+
+.meeting-channel-icon {
   display: flex;
   align-items: center;
-  gap: 8px;
+}
+
+.meeting-title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.pill-divider {
+  width: 1px;
+  height: 13px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.meeting-phase-tag {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.meeting-timer {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.meeting-info-pill.urgent .meeting-timer {
+  color: #f87171;
+}
+
+.meeting-participants {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.bystander-chip {
+  background: rgba(240, 178, 50, 0.16);
+  color: var(--discord-yellow);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Context Action Bar (Right side of top bar) */
+.context-action-bar {
+  background: #1b1c20;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 8px 5px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  max-width: 720px;
+}
+
+.context-instruction {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .action-cta-btn {
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 700;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  white-space: nowrap;
 }
 
-.action-cta-btn:hover {
-  transform: translateY(-1px);
+.action-cta-btn.gold,
+.action-cta-btn.blurple {
+  background: var(--discord-blurple);
+  color: #fff;
+}
+
+.action-cta-btn.gold:hover,
+.action-cta-btn.blurple:hover {
+  background: var(--discord-blurple-hover);
 }
 
 .action-cta-btn.approve {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: var(--discord-green);
   color: #fff;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.action-cta-btn.approve:hover {
+  background: var(--discord-green-hover);
 }
 
 .action-cta-btn.reject {
-  background: linear-gradient(135deg, #f43f5e, #e11d48);
+  background: var(--discord-red);
   color: #fff;
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.4);
 }
 
-.action-cta-btn.gold {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #090b12;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+.action-cta-btn.reject:hover {
+  background: var(--discord-red-hover);
 }
 
-/* 7-Tile Zoom Conference Grid */
-.zoom-grid {
+/* 8-Tile 4x2 16:9 Video Call Grid */
+.video-grid-8 {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(2, 1fr);
-  gap: 10px;
-  overflow: hidden;
+  gap: 12px;
+  min-height: 0;
 }
 
 .zoom-tile {
   position: relative;
-  background: #0e1322;
-  border-radius: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.09);
+  background: var(--bg-tile);
+  border-radius: 10px;
+  border: 2px solid transparent;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
 }
 
 .zoom-tile:hover {
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
+/* Authentic Discord Green Speaking Ring */
 .zoom-tile.speaking-now {
-  border-color: #10b981;
-  box-shadow: 0 0 22px rgba(16, 185, 129, 0.45);
+  border-color: var(--discord-green);
+  box-shadow: 0 0 0 1px rgba(35, 165, 90, 0.35);
 }
 
 .zoom-tile.on-proposed-team {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 16px rgba(6, 182, 212, 0.35);
+  border-color: var(--discord-blurple);
 }
 
 .zoom-tile.selected-for-proposal {
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 18px rgba(245, 158, 11, 0.5);
-}
-
-.zoom-tile.accused-target {
-  border-color: var(--accent-red);
+  border-color: var(--discord-yellow);
 }
 
 .tile-media-layer {
@@ -651,6 +803,7 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
+  background: #16181c;
 }
 
 .tile-media-layer canvas,
@@ -661,144 +814,348 @@ body {
   display: block;
 }
 
+/* Subtle Top Status Pills inside Video Tile */
 .tile-top-overlays {
-  position: relative;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
   z-index: 2;
-  padding: 8px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 4px;
   pointer-events: none;
 }
 
-.tile-badges-left, .tile-badges-right {
+.tile-badges-left,
+.tile-badges-right {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-}
-
-.tile-badge {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 5px;
-  backdrop-filter: blur(6px);
-}
-
-.tile-badge.leader-crown {
-  background: rgba(245, 158, 11, 0.92);
-  color: #090b12;
-}
-
-.tile-badge.team-shield {
-  background: rgba(6, 182, 212, 0.92);
-  color: #090b12;
-}
-
-.tile-badge.epistemic-evil {
-  background: rgba(244, 63, 94, 0.92);
-  color: #fff;
-}
-
-.tile-badge.epistemic-merlin-cand {
-  background: rgba(168, 85, 247, 0.92);
-  color: #fff;
-}
-
-.tile-badge.vote-approve {
-  background: rgba(16, 185, 129, 0.95);
-  color: #06281e;
-}
-
-.tile-badge.vote-reject {
-  background: rgba(244, 63, 94, 0.95);
-  color: #fff;
-}
-
-/* Live Subtitle Bubble Inside Zoom Tile */
-.tile-live-caption {
-  position: relative;
-  z-index: 2;
-  margin: auto 8px 4px 8px;
-  background: rgba(9, 11, 18, 0.84);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-left: 3px solid var(--accent-pink);
-  padding: 6px 8px;
-  border-radius: 8px;
-  font-size: 11px;
-  line-height: 1.35;
-  color: #f8fafc;
-  max-height: 68px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.tile-bottom-bar {
-  position: relative;
-  z-index: 2;
-  background: linear-gradient(0deg, rgba(6, 8, 15, 0.95) 0%, rgba(6, 8, 15, 0.55) 75%, transparent 100%);
-  padding: 10px 9px 7px 9px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.idol-name-cluster {
-  display: flex;
-  flex-direction: column;
-}
-
-.idol-name {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 800;
-  color: #fff;
-  display: flex;
-  align-items: center;
   gap: 5px;
 }
 
-.idol-archetype {
-  font-size: 10px;
-  color: #cbd5e1;
+.tile-badge {
+  background: rgba(15, 16, 19, 0.78);
+  backdrop-filter: blur(8px);
+  color: var(--text-normal);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Audio Waveform Indicator */
+.tile-badge.leader-crown {
+  background: rgba(240, 178, 50, 0.9);
+  color: #111214;
+  border: none;
+}
+
+.tile-badge.team-shield {
+  background: rgba(88, 101, 242, 0.9);
+  color: #fff;
+  border: none;
+}
+
+.tile-badge.epistemic-evil {
+  background: rgba(218, 55, 60, 0.88);
+  color: #fff;
+  border: none;
+}
+
+.tile-badge.epistemic-merlin-cand {
+  background: rgba(139, 92, 246, 0.88);
+  color: #fff;
+  border: none;
+}
+
+.tile-badge.vote-approve {
+  background: rgba(35, 165, 90, 0.92);
+  color: #fff;
+  border: none;
+}
+
+.tile-badge.vote-reject {
+  background: rgba(218, 55, 60, 0.92);
+  color: #fff;
+  border: none;
+}
+
+/* Clean Closed-Caption Subtitle Overlay when speaking */
+.tile-live-caption {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 42px;
+  z-index: 2;
+  background: rgba(12, 13, 16, 0.82);
+  backdrop-filter: blur(8px);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.38;
+  color: #f2f3f5;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Bottom-Left Participant Name Pill (Matching Reference Image) */
+.tile-bottom-pill {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 2;
+  background: rgba(15, 16, 19, 0.76);
+  backdrop-filter: blur(8px);
+  padding: 5px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.tile-participant-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #f2f3f5;
+  letter-spacing: -0.01em;
+}
+
+/* Green Equalizer Bars inside Bottom-Left Pill */
 .audio-waveform-bars {
-  display: flex;
-  align-items: flex-end;
+  display: inline-flex;
+  align-items: center;
   gap: 2px;
-  height: 14px;
+  height: 12px;
 }
 
 .audio-waveform-bars span {
-  width: 3px;
+  width: 2.5px;
   height: 4px;
-  background: #10b981;
+  background: var(--discord-green);
   border-radius: 2px;
+  opacity: 0.7;
   transition: height 0.08s ease;
 }
 
-.speaking-now .audio-waveform-bars span:nth-child(1) { animation: waveBar 0.42s infinite ease-in-out 0.0s; }
-.speaking-now .audio-waveform-bars span:nth-child(2) { animation: waveBar 0.42s infinite ease-in-out 0.1s; }
-.speaking-now .audio-waveform-bars span:nth-child(3) { animation: waveBar 0.42s infinite ease-in-out 0.2s; }
-.speaking-now .audio-waveform-bars span:nth-child(4) { animation: waveBar 0.42s infinite ease-in-out 0.15s; }
-.speaking-now .audio-waveform-bars span:nth-child(5) { animation: waveBar 0.42s infinite ease-in-out 0.05s; }
-
-@keyframes waveBar {
-  0%, 100% { height: 4px; }
-  50% { height: 14px; }
+.speaking-now .audio-waveform-bars span {
+  opacity: 1;
 }
 
-/* Bottom Live Chat & Voice Interrogation Dock */
-.live-chat-dock {
-  background: var(--bg-panel);
+.speaking-now .audio-waveform-bars span:nth-child(1) { animation: eqBar 0.4s infinite ease-in-out 0.0s; }
+.speaking-now .audio-waveform-bars span:nth-child(2) { animation: eqBar 0.4s infinite ease-in-out 0.12s; }
+.speaking-now .audio-waveform-bars span:nth-child(3) { animation: eqBar 0.4s infinite ease-in-out 0.24s; }
+.speaking-now .audio-waveform-bars span:nth-child(4) { animation: eqBar 0.4s infinite ease-in-out 0.08s; }
+
+@keyframes eqBar {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+
+/* Bottom Floating Circular Call Controls Dock */
+.call-controls-dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.call-buttons-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #1b1c20;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 8px 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+}
+
+.call-circle-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #2b2d31;
+  color: var(--text-normal);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.call-circle-btn:hover {
+  background: #383a40;
+}
+
+.call-circle-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.call-circle-btn.recording {
+  background: var(--discord-green);
+  color: #fff;
+}
+
+.call-circle-btn.hangup {
+  background: var(--discord-red);
+  color: #fff;
+}
+
+.call-circle-btn.hangup:hover {
+  background: var(--discord-red-hover);
+}
+
+/* =========================================================================
+   4. RIGHT DISCORD VOICE CHAT & INSPECTOR DRAWER (324px)
+   ========================================================================= */
+.chat-drawer {
+  background: var(--bg-chat);
+  border-left: 1px solid rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.chat-drawer-header {
+  height: 48px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.rail-tabs {
+  display: flex;
+  width: 100%;
+  background: #1e1f22;
+  padding: 3px;
+  border-radius: 6px;
+  gap: 3px;
+}
+
+.rail-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.rail-tab.active {
+  background: #35373c;
+  color: var(--text-normal);
+}
+
+.rail-tab-content {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rail-tab-content.active {
+  display: flex;
+}
+
+/* Discord Message List */
+.discord-messages-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.discord-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.msg-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #1e1f22;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg-avatar-fallback {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--discord-blurple);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.msg-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.msg-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.msg-author.mc {
+  color: var(--discord-yellow);
+}
+
+.msg-author.human {
+  color: #60a5fa;
+}
+
+.msg-meta {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+.msg-text {
+  font-size: 13px;
+  line-height: 1.42;
+  color: var(--text-secondary);
+  word-wrap: break-word;
+}
+
+/* Bottom Discord Chat Composer */
+.discord-chat-composer {
+  padding: 8px 12px 12px 12px;
+  background: var(--bg-chat);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -806,288 +1163,157 @@ body {
 
 .mention-chips-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
   flex-wrap: wrap;
-}
-
-.chips-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
+  gap: 4px;
 }
 
 .mention-chip {
-  background: #1a2138;
-  border: 1px solid var(--border-subtle);
-  color: #cbd5e1;
+  background: #232428;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
   font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 999px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 4px;
   cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.mention-chip:hover {
+  color: var(--text-normal);
+  background: #2b2d31;
 }
 
 .mention-chip.active {
-  background: rgba(236, 72, 153, 0.22);
-  border-color: var(--accent-pink);
-  color: #f9a8d4;
+  background: rgba(88, 101, 242, 0.24);
+  border-color: var(--discord-blurple);
+  color: #c7d2fe;
 }
 
-.chat-input-row {
+.discord-input-box {
   display: flex;
   align-items: center;
-  gap: 8px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 40px;
 }
 
-.mic-btn {
-  background: rgba(244, 63, 94, 0.18);
-  border: 1px solid rgba(244, 63, 94, 0.5);
-  color: #fda4af;
-  padding: 9px 12px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.mic-btn.recording {
-  background: #f43f5e;
-  color: #fff;
-  box-shadow: 0 0 15px #f43f5e;
-}
-
-.chat-text-input {
+.discord-text-input {
   flex: 1;
-  background: #0d1220;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  padding: 9px 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
+  background: transparent;
+  border: none;
+  color: var(--text-normal);
+  font-size: 13px;
   outline: none;
 }
 
-.chat-text-input:focus {
-  border-color: var(--accent-pink);
+.discord-text-input::placeholder {
+  color: var(--text-faint);
 }
 
-.send-btn, .beat-btn, .vote-now-btn {
-  padding: 9px 12px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-
-.send-btn {
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-indigo));
-  color: #fff;
-}
-
-.beat-btn {
-  background: #1e2640;
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #e2e8f0;
-}
-
-.vote-now-btn {
-  background: rgba(245, 158, 11, 0.2);
-  border-color: rgba(245, 158, 11, 0.55);
-  color: #fcd34d;
-}
-
-/* Right Telemetry & Transcript Rail */
-.right-telemetry-rail {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.rail-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.rail-tab {
-  background: transparent;
+.discord-send-btn {
+  background: none;
   border: none;
   color: var(--text-muted);
-  padding: 10px 8px;
-  font-size: 11.5px;
-  font-weight: 700;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
 }
 
-.rail-tab.active {
-  color: #fff;
-  border-bottom-color: var(--accent-pink);
-  background: rgba(236, 72, 153, 0.08);
+.discord-send-btn:hover {
+  color: var(--text-normal);
 }
 
-.rail-tab-content {
-  display: none;
+/* Tab 2: Judge X-Ray Inspector */
+.xray-scroll-area {
   flex: 1;
   overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.xray-block {
+  background: #232428;
+  border-radius: 8px;
   padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.rail-tab-content.active {
+.xray-block-header {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.transcript-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.transcript-item {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-}
-
-.transcript-item.mc-item {
-  border-left: 3px solid var(--accent-gold);
-}
-
-.transcript-item.human-item {
-  border-left: 3px solid var(--accent-cyan);
-}
-
-.transcript-item.idol-item {
-  border-left: 3px solid var(--accent-pink);
-}
-
-.t-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
-}
-
-.t-speaker {
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.t-meta {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
-}
-
-.t-text {
-  line-height: 1.42;
-  color: #e2e8f0;
-}
-
-.t-verify {
-  margin-top: 5px;
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: #6ee7b7;
-}
-
-/* Judge X-Ray Sections */
-.xray-section {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 9px;
-}
-
-.xray-header-row {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.xray-header-row h3 {
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.verified-pill {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  background: rgba(16, 185, 129, 0.18);
-  color: #6ee7b7;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.xray-log-list, .xray-monologue-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 190px;
-  overflow-y: auto;
   font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 
-.xray-card {
-  background: rgba(9, 11, 18, 0.65);
-  border: 1px solid var(--border-subtle);
-  border-radius: 7px;
-  padding: 6px 8px;
-}
-
-.xray-thought {
-  color: #fcd34d;
-  font-style: italic;
-  margin-top: 3px;
+.xray-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 500;
 }
 
 .true-roles-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 5px;
+  transition: filter 0.18s ease;
 }
 
 .blurred-spoilers {
-  filter: blur(7px);
-  transition: filter 0.2s ease;
+  filter: blur(6px);
+  user-select: none;
 }
 
 .true-role-chip {
-  background: rgba(9, 11, 18, 0.7);
+  background: #1e1f22;
   padding: 5px 7px;
-  border-radius: 6px;
-  font-size: 10.5px;
-  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
-.mini-btn {
-  background: #242c46;
-  border: 1px solid var(--border-subtle);
-  color: #cbd5e1;
+.xray-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.xray-card {
+  background: #1e1f22;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.xray-thought {
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 3px;
+}
+
+.t-verify {
+  font-family: var(--font-mono);
   font-size: 10px;
-  padding: 3px 7px;
-  border-radius: 5px;
-  cursor: pointer;
+  color: #4ade80;
+  margin-top: 3px;
 }
 
 /* Modal */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(5, 7, 12, 0.78);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1095,12 +1321,11 @@ body {
 }
 
 .modal-card {
-  width: 520px;
-  max-width: 92vw;
-  background: var(--bg-panel);
-  border: 1px solid rgba(236, 72, 153, 0.45);
-  border-radius: 16px;
+  width: 440px;
+  background: #313338;
+  border-radius: 8px;
   padding: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
 .modal-header {
@@ -1111,8 +1336,8 @@ body {
 }
 
 .modal-header h2 {
-  font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .modal-desc {
@@ -1127,29 +1352,51 @@ body {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 14px;
-  font-size: 12px;
+}
+
+.modal-form-group label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .modal-input {
-  background: #0b0f1b;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #fff;
-  padding: 10px 12px;
-  border-radius: 8px;
+  background: #1e1f22;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 9px 10px;
+  color: var(--text-normal);
   font-family: var(--font-mono);
+  font-size: 12.5px;
 }
 
 .modal-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+}
+
+.discord-btn {
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.discord-btn.primary {
+  background: var(--discord-blurple);
+  color: #fff;
+}
+
+.discord-btn.secondary {
+  background: #4e5058;
+  color: #fff;
 }
 
 .modal-status {
   margin-top: 10px;
   font-size: 12px;
-  color: #6ee7b7;
-}
-
-.hidden {
-  display: none !important;
+  color: #4ade80;
 }
