@@ -65,6 +65,7 @@ const state = {
   voiceAudioEl: null,
   activeVoiceBlobUrl: null,
   activeSpeechResolve: null,
+  speechQueuePromise: Promise.resolve(),
   audioUnlocked: false,
   pendingAutoplayTurn: null,
   prefetchedDiscussionPayload: null,
@@ -156,7 +157,11 @@ function showAutoplayUnlockBanner(show) {
  * (e.g. `Let Leader Propose` or `Next Idol Turn`), the stale greeting does NOT collide with the new turn.
  */
 function setupAudioUnlockListeners() {
+  const evtNames = ['pointerdown', 'click', 'touchstart', 'keydown'];
   const unlock = () => {
+    evtNames.forEach((evtName) => {
+      window.removeEventListener(evtName, unlock);
+    });
     const wasUnlocked = state.audioUnlocked;
     state.audioUnlocked = true;
     const ctx = ensureAudioEngineReady();
@@ -171,13 +176,18 @@ function setupAudioUnlockListeners() {
       const queuedTurn = state.pendingAutoplayTurn;
       state.pendingAutoplayTurn = null;
       setTimeout(() => {
-        if (!state.isBusyRequest && !state.isWaitingServer && !state.isPlayingAudio) {
+        if (
+          !state.isBusyRequest &&
+          !state.isWaitingServer &&
+          !state.isPlayingAudio &&
+          !state.activeSpeakerId
+        ) {
           playTurnVoiceAndHighlight(queuedTurn);
         }
       }, 120);
     }
   };
-  ['pointerdown', 'click', 'touchstart', 'keydown'].forEach((evtName) => {
+  evtNames.forEach((evtName) => {
     window.addEventListener(evtName, unlock, { passive: true });
   });
 }
@@ -399,10 +409,19 @@ function preloadPortraitImages() {
 }
 
 /**
- * Aborts any in-flight `/discuss/step` request so user-initiated
+ * Aborts any in-flight `/discuss/step` request or lookahead prefetch so user-initiated
  * chat or phase transition buttons execute immediately without waiting or being dropped.
  */
 function abortPendingAutoStep() {
+  state.prefetchedDiscussionPayload = null;
+  if (state.prefetchAbortController) {
+    try {
+      state.prefetchAbortController.abort();
+    } catch {
+      // Ignore abort errors
+    }
+    state.prefetchAbortController = null;
+  }
   if (state.autoStepAbortController) {
     try {
       state.autoStepAbortController.abort();
@@ -458,6 +477,7 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
   state.isWaitingServer = true;
   state.pendingHumanChatQueue = [];
   state.selectedProposalIds.clear();
+  state.proposalLobbyCount = 0;
   stopActiveSpeech();
 
   try {
@@ -484,6 +504,10 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
     if (!response.ok) throw new Error(data.error || 'Failed to start game');
     if (mySeq !== state.gameStartSeq) return;
 
+    if (data.latestTurn) {
+      state.isPlayingAudio = true;
+      state.activeSpeakerId = data.latestTurn.speakerId;
+    }
     applyServerGameState(data);
     resetPhaseClock(data.board.phaseTimerSec);
     // Release network lock immediately so user can click or chat while MC Jae-ho speaks!
@@ -809,29 +833,81 @@ function renderSecretRoleCard() {
 }
 
 /**
- * Renders the context-sensitive Phase Action Bar in the top header of the video stage.
- * All in-game phase progression buttons live inside `#bannerActionControls`.
- */
+  * Renders the High-Visibility Phase Action Bar in BOTH:
+  * 1. Top header of the video stage (`#phaseActionBanner` / `#bannerActionControls`)
+  * 2. Synchronized Chat Action Dock right above the chat input (`#chatPhaseActionDock` / `#chatDockActionControls`)
+  * Also renders interactive Member Selection Chips when Human is Leader in `TEAM_PROPOSAL`.
+  */
 function renderPhaseActionBanner() {
   const board = state.board;
   if (!board) return;
 
+  const bannerEl = document.getElementById('phaseActionBanner');
   const badge = document.getElementById('bannerPhaseBadge');
   const instruction = document.getElementById('bannerInstructionText');
   const controls = document.getElementById('bannerActionControls');
+  const bannerChips = document.getElementById('bannerMemberChips');
+
+  const chatDockEl = document.getElementById('chatPhaseActionDock');
+  const chatBadge = document.getElementById('chatDockPhaseBadge');
+  const chatInstruction = document.getElementById('chatDockInstructionText');
+  const chatControls = document.getElementById('chatDockActionControls');
+  const chatChips = document.getElementById('chatDockMemberChips');
+
   if (!badge || !instruction || !controls) return;
 
-  badge.textContent = `Quest ${board.currentQuestNumber} (${board.requiredTeamSize}P)`;
+  const questLabel = `Quest ${board.currentQuestNumber} (${board.requiredTeamSize}인 원정대)`;
+  badge.textContent = questLabel;
+  if (chatBadge) chatBadge.textContent = questLabel;
+
   controls.innerHTML = '';
+  if (chatControls) chatControls.innerHTML = '';
+  if (bannerChips) {
+    bannerChips.innerHTML = '';
+    bannerChips.classList.add('hidden');
+  }
+  if (chatChips) {
+    chatChips.innerHTML = '';
+    chatChips.classList.add('hidden');
+  }
+
+  const setDualInstruction = (text, needsHumanAction = false) => {
+    instruction.textContent = text;
+    if (chatInstruction) chatInstruction.textContent = text;
+    bannerEl?.classList.toggle('needs-human-action', Boolean(needsHumanAction));
+    chatDockEl?.classList.toggle('needs-human-action', Boolean(needsHumanAction));
+  };
+
+  const addDualButton = (label, className, onClick, title = '') => {
+    const createBtn = () => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `action-cta-btn ${className}`;
+      btn.textContent = label;
+      if (title) btn.title = title;
+      btn.onclick = onClick;
+      return btn;
+    };
+    controls.appendChild(createBtn());
+    if (chatControls) {
+      chatControls.appendChild(createBtn());
+    }
+  };
 
   if (state.phaseActionStatusText) {
-    instruction.textContent = state.phaseActionStatusText;
-    const statusPill = document.createElement('button');
-    statusPill.className = 'action-cta-btn blurple';
-    statusPill.disabled = true;
-    statusPill.style.opacity = '0.85';
-    statusPill.textContent = '⏳ Processing...';
-    controls.appendChild(statusPill);
+    setDualInstruction(state.phaseActionStatusText, false);
+    const addStatusPill = (container) => {
+      if (!container) return;
+      const statusPill = document.createElement('button');
+      statusPill.type = 'button';
+      statusPill.className = 'action-cta-btn blurple';
+      statusPill.disabled = true;
+      statusPill.style.opacity = '0.85';
+      statusPill.textContent = '⏳ 진행 중 (Processing...)';
+      container.appendChild(statusPill);
+    };
+    addStatusPill(controls);
+    addStatusPill(chatControls);
     return;
   }
 
@@ -842,136 +918,185 @@ function renderPhaseActionBanner() {
       }
       const count = state.selectedProposalIds.size;
       const req = board.requiredTeamSize;
-      instruction.textContent = `You are Leader — select ${req} tiles (${count}/${req} selected) or click Propose Team`;
+      setDualInstruction(
+        `👑 당신이 원정대장(Leader)입니다! 아래 멤버 칩(또는 화면 타일)에서 ${req}명을 선택 후 [팀 제안 확정]을 누르세요 (${count}/${req}명 선택됨)`,
+        true
+      );
 
-      const lobbyBtn = document.createElement('button');
-      lobbyBtn.className = 'action-cta-btn secondary';
-      lobbyBtn.textContent = '⏭️ Hear Idol Pitch';
-      lobbyBtn.title = 'Hear an AI Idol pitch or lobby before the Quest Team is locked in';
-      lobbyBtn.onclick = () => triggerDiscussionStep(null, { isAutoStep: false });
+      // Render interactive Member Selection Chips in both top HUD and chat dock
+      const populateMemberChips = (chipContainer) => {
+        if (!chipContainer) return;
+        chipContainer.classList.remove('hidden');
+        state.players.forEach((p) => {
+          const isSelected = state.selectedProposalIds.has(p.id);
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = `member-chip-btn ${isSelected ? 'selected' : ''}`;
+          const shortName = p.isHuman ? 'Guest (나)' : p.koreanName || p.name;
+          chip.textContent = `${isSelected ? '✓' : '+'} ${shortName}`;
+          chip.title = `${shortName} 원정대 포함/제외 토글`;
+          chip.onclick = () => handleTileClick(p.id);
+          chipContainer.appendChild(chip);
+        });
+      };
+      populateMemberChips(bannerChips);
+      populateMemberChips(chatChips);
 
-      const btn = document.createElement('button');
-      btn.className = 'action-cta-btn blurple';
-      btn.textContent = `✅ Propose Team (${count}/${req})`;
-      btn.onclick = () => triggerTeamProposal([...state.selectedProposalIds]);
-      controls.appendChild(lobbyBtn);
-      controls.appendChild(btn);
+      addDualButton(
+        `👑 팀 제안 확정 (${count}/${req}명)`,
+        'approve',
+        () => triggerTeamProposal([...state.selectedProposalIds]),
+        '선택한 원정대 팀을 확정하고 토론/투표 단계로 이동합니다'
+      );
+      addDualButton(
+        '⏭️ 아이돌 어필 듣기',
+        'secondary',
+        () => triggerDiscussionStep(null, { isAutoStep: false }),
+        '원정대 확정 전에 AI 아이돌들의 어필/추천 발언을 먼저 듣습니다'
+      );
     } else {
-      instruction.textContent = `Leader ${board.leaderName} is selecting ${board.requiredTeamSize} players for Quest ${board.currentQuestNumber}...`;
-      const btn = document.createElement('button');
-      btn.className = 'action-cta-btn blurple';
-      btn.textContent = `✨ Let Leader Propose`;
-      btn.onclick = () => triggerTeamProposal([]);
-      controls.appendChild(btn);
+      setDualInstruction(
+        `👑 원정대장 ${board.leaderName} 님이 Quest ${board.currentQuestNumber} (${board.requiredTeamSize}인) 원정대를 고르고 있습니다...`,
+        false
+      );
+      addDualButton(
+        '✨ 리더 팀 제안 바로 보기 (Propose Now)',
+        'blurple',
+        () => triggerTeamProposal([]),
+        '리더의 원정대 제안을 즉시 발표하고 토론/투표로 넘어갑니다'
+      );
+      addDualButton(
+        '⏭️ 사전 로비 발언 듣기',
+        'secondary',
+        () => triggerDiscussionStep(null, { isAutoStep: false }),
+        '리더가 팀을 확정하기 전에 다른 멤버들의 어필을 듣습니다'
+      );
     }
   } else if (board.phase === 'DISCUSSION') {
     const teamStr = board.proposedTeamNames.join(', ');
-    instruction.textContent = `Proposed Team [${teamStr}] — Debate or Vote Now:`;
+    setDualInstruction(
+      `💬 제안된 원정대 [${teamStr}] — 채팅으로 질문하거나 바로 찬성/반대 투표를 누르세요!`,
+      true
+    );
 
-    const nextBeatBtn = document.createElement('button');
-    nextBeatBtn.className = 'action-cta-btn secondary';
-    nextBeatBtn.textContent = '⏭️ Next Idol Turn';
-    nextBeatBtn.title = 'Advance to the next AI Idol reaction immediately';
-    nextBeatBtn.onclick = () => {
-      state.discussionElapsedSec = Math.max(state.discussionElapsedSec, 25);
-      state.lastAutoBeatSec = state.discussionElapsedSec;
-      triggerDiscussionStep(null, { isAutoStep: false });
-    };
-
-    const voteNowBtn = document.createElement('button');
-    voteNowBtn.className = 'action-cta-btn blurple';
-    voteNowBtn.textContent = '🗳️ Start Vote';
-    voteNowBtn.title = 'Open the 7-player Team Vote phase';
-    voteNowBtn.onclick = () => triggerCallVotePhase();
-
-    const quickApproveBtn = document.createElement('button');
-    quickApproveBtn.className = 'action-cta-btn approve';
-    quickApproveBtn.textContent = '✅ Approve';
-    quickApproveBtn.title = 'Immediately cast APPROVE vote and resolve all 7 votes';
-    quickApproveBtn.onclick = () => triggerSubmitVote('APPROVE');
-
-    const quickRejectBtn = document.createElement('button');
-    quickRejectBtn.className = 'action-cta-btn reject';
-    quickRejectBtn.textContent = '❌ Reject';
-    quickRejectBtn.title = 'Immediately cast REJECT vote and resolve all 7 votes';
-    quickRejectBtn.onclick = () => triggerSubmitVote('REJECT');
-
-    controls.appendChild(nextBeatBtn);
-    controls.appendChild(voteNowBtn);
-    controls.appendChild(quickApproveBtn);
-    controls.appendChild(quickRejectBtn);
+    addDualButton(
+      '✅ 찬성 투표 (Approve)',
+      'approve',
+      () => triggerSubmitVote('APPROVE'),
+      '이 원정대 구성에 즉시 찬성(APPROVE) 투표하고 7인 결과를 공개합니다'
+    );
+    addDualButton(
+      '❌ 반대 투표 (Reject)',
+      'reject',
+      () => triggerSubmitVote('REJECT'),
+      '이 원정대 구성에 즉시 반대(REJECT) 투표하고 7인 결과를 공개합니다'
+    );
+    addDualButton(
+      '⏭️ 다음 아이돌 발언',
+      'secondary',
+      () => {
+        state.discussionElapsedSec = Math.max(state.discussionElapsedSec, 25);
+        state.lastAutoBeatSec = state.discussionElapsedSec;
+        triggerDiscussionStep(null, { isAutoStep: false });
+      },
+      '다음 AI 아이돌의 추리/반박 발언을 즉시 듣습니다'
+    );
+    addDualButton(
+      '🗳️ 투표 단계 전환',
+      'blurple',
+      () => triggerCallVotePhase(),
+      '토론을 마치고 공식 7인 찬반 투표 단계(TEAM VOTE)로 전환합니다'
+    );
   } else if (board.phase === 'TEAM_VOTE') {
     const teamStr = board.proposedTeamNames.join(', ');
-    instruction.textContent = `🗳️ Vote on ${board.leaderName}'s Team [${teamStr}]:`;
-    const approveBtn = document.createElement('button');
-    approveBtn.className = 'action-cta-btn approve';
-    approveBtn.textContent = '✅ Approve';
-    approveBtn.onclick = () => triggerSubmitVote('APPROVE');
-
-    const rejectBtn = document.createElement('button');
-    rejectBtn.className = 'action-cta-btn reject';
-    rejectBtn.textContent = '❌ Reject';
-    rejectBtn.onclick = () => triggerSubmitVote('REJECT');
-
-    controls.appendChild(approveBtn);
-    controls.appendChild(rejectBtn);
+    setDualInstruction(
+      `🗳️ [필수 투표] ${board.leaderName}의 원정대 [${teamStr}] — 찬성 또는 반대를 선택하세요!`,
+      true
+    );
+    addDualButton(
+      '✅ 찬성 투표 (Approve)',
+      'approve',
+      () => triggerSubmitVote('APPROVE'),
+      '원정대 출발에 찬성(APPROVE) 표를 던집니다'
+    );
+    addDualButton(
+      '❌ 반대 투표 (Reject)',
+      'reject',
+      () => triggerSubmitVote('REJECT'),
+      '원정대 출발에 반대(REJECT) 표를 던집니다'
+    );
   } else if (board.phase === 'QUEST_EXECUTION') {
     const humanOnMission = board.proposedTeamIds.includes('player_human');
     const humanAlignment = state.humanPrivateView?.self?.alignment || 'GOOD';
 
     if (humanOnMission) {
-      instruction.textContent = `⚔️ You are on Quest ${board.currentQuestNumber} — Submit your Quest card:`;
-      const successBtn = document.createElement('button');
-      successBtn.className = 'action-cta-btn approve';
-      successBtn.textContent = '✅ Success';
-      successBtn.onclick = () => triggerSubmitQuestCard('SUCCESS');
-      controls.appendChild(successBtn);
+      setDualInstruction(
+        `⚔️ [원정대 임무 수행] 당신은 Quest ${board.currentQuestNumber} 원정대원입니다! 임무 카드를 제출하세요:`,
+        true
+      );
+      addDualButton(
+        '✅ 임무 성공 (Success)',
+        'approve',
+        () => triggerSubmitQuestCard('SUCCESS'),
+        '원정 임무 성공(SUCCESS) 카드를 제출합니다'
+      );
 
       if (humanAlignment === 'EVIL') {
-        const failBtn = document.createElement('button');
-        failBtn.className = 'action-cta-btn reject';
-        failBtn.textContent = '🗡️ Fail (Sabotage)';
-        failBtn.onclick = () => triggerSubmitQuestCard('FAIL');
-        controls.appendChild(failBtn);
+        addDualButton(
+          '🗡️ 임무 실패 (Sabotage)',
+          'reject',
+          () => triggerSubmitQuestCard('FAIL'),
+          '악의 세력 전용: 원정 임무 실패(FAIL) 사보타주 카드를 제출합니다'
+        );
       }
     } else {
-      instruction.textContent = `⚔️ Team [${board.proposedTeamNames.join(', ')}] is executing Quest ${board.currentQuestNumber}...`;
-      const revealBtn = document.createElement('button');
-      revealBtn.className = 'action-cta-btn blurple';
-      revealBtn.textContent = '⚡ Reveal Outcome';
-      revealBtn.onclick = () => triggerSubmitQuestCard('SUCCESS');
-      controls.appendChild(revealBtn);
+      setDualInstruction(
+        `⚔️ 원정대 [${board.proposedTeamNames.join(', ')}]가 Quest ${board.currentQuestNumber} 임무를 수행 중입니다...`,
+        false
+      );
+      addDualButton(
+        '⚡ 임무 결과 공개 (Reveal Outcome)',
+        'blurple',
+        () => triggerSubmitQuestCard('SUCCESS'),
+        '원정대 임무 성공/실패 카드 결과를 즉시 공개합니다'
+      );
     }
   } else if (board.phase === 'ASSASSIN_PHASE') {
     const humanIsAssassin = state.humanPrivateView?.self?.roleId === 'ASSASSIN';
     if (humanIsAssassin) {
-      instruction.textContent = `🗡️ You are the Assassin — click a target below or on the stage to shoot Merlin:`;
+      setDualInstruction(
+        `🗡️ [암살자 지목] 당신은 암살자(Assassin)입니다! 멀린(Merlin)으로 의심되는 대상을 지목하세요:`,
+        true
+      );
       const knownTeammates = state.humanPrivateView?.epistemicVision?.knownEvilTeammateIds || [];
       state.players
         .filter((p) => p.id !== 'player_human' && !knownTeammates.includes(p.id))
         .forEach((p) => {
-          const targetBtn = document.createElement('button');
-          targetBtn.className = 'action-cta-btn reject';
-          targetBtn.textContent = `🎯 ${p.koreanName || p.name}`;
-          targetBtn.onclick = () => triggerAssassination(p.id);
-          controls.appendChild(targetBtn);
+          addDualButton(
+            `🎯 ${p.koreanName || p.name} 암살`,
+            'reject',
+            () => triggerAssassination(p.id),
+            `${p.koreanName || p.name} 님을 멀린으로 지목하여 암살을 시도합니다`
+          );
         });
     } else {
-      instruction.textContent = `🗡️ Good passed 3 Quests — Assassin is choosing a target for Merlin...`;
-      const fireBtn = document.createElement('button');
-      fireBtn.className = 'action-cta-btn reject';
-      fireBtn.textContent = '🗡️ Resolve Assassin Shot';
-      fireBtn.onclick = () => triggerAssassination(null);
-      controls.appendChild(fireBtn);
+      setDualInstruction(
+        `🗡️ 선의 세력 3승 달성! 암살자가 마지막 역전을 위해 멀린(Merlin)을 지목하고 있습니다...`,
+        false
+      );
+      addDualButton(
+        '🗡️ 암살 결과 확인 (Resolve Assassin Shot)',
+        'reject',
+        () => triggerAssassination(null),
+        '암살자의 최종 멀린 지목 결과를 즉시 확인합니다'
+      );
     }
   } else if (board.phase === 'GAME_OVER') {
-    badge.textContent = `${board.winner} Victory`;
-    instruction.textContent = board.winReason;
-    const playAgainBtn = document.createElement('button');
-    playAgainBtn.className = 'action-cta-btn blurple';
-    playAgainBtn.textContent = '🔄 Play Again';
-    playAgainBtn.onclick = () => startNewGame('STANDARD');
-    controls.appendChild(playAgainBtn);
+    const winLabel = `${board.winner} Victory`;
+    badge.textContent = winLabel;
+    if (chatBadge) chatBadge.textContent = winLabel;
+    setDualInstruction(`🏆 ${board.winReason}`, false);
+    addDualButton('🔄 새 게임 시작 (Play Again)', 'blurple', () => startNewGame('STANDARD'));
   }
 }
 
@@ -1225,6 +1350,30 @@ function renderTranscriptAndXray() {
             ? `<button type="button" class="msg-replay-btn" data-replay-id="${item.id}" title="Play / Replay Character Voice">🔊</button>`
             : '';
 
+        const chainPills = [];
+        if (item.replyToSpeakerName) {
+          const isHumanReply = item.replyToSpeakerId === 'player_human';
+          const snippetAttr = item.replyToSnippet
+            ? String(item.replyToSnippet).replace(/"/g, '&quot;')
+            : '';
+          chainPills.push(
+            `<span class="reply-pill ${isHumanReply ? 'human-reply' : ''}" title="${snippetAttr}">↪ ${isHumanReply ? '💬' : '🎙️'} @${item.replyToSpeakerName} 발언에 ${isHumanReply ? '답변' : '응답'}</span>`
+          );
+        }
+        if (
+          item.targetPlayerName &&
+          item.targetPlayerId &&
+          item.targetPlayerId !== item.speakerId
+        ) {
+          chainPills.push(
+            `<span class="target-pill">🎯 → @${item.targetPlayerName} 지목</span>`
+          );
+        }
+        const replyChainHtml =
+          chainPills.length > 0
+            ? `<div class="msg-reply-chain">${chainPills.join('')}</div>`
+            : '';
+
         return `
           <div class="discord-msg">
             ${avatarEl}
@@ -1236,6 +1385,7 @@ function renderTranscriptAndXray() {
                 ${floorBadgeHtml}
                 ${replayBtnHtml}
               </div>
+              ${replyChainHtml}
               <div class="msg-text">${item.text}</div>
             </div>
           </div>
@@ -1455,14 +1605,31 @@ async function handleHumanChatSubmission(rawText, options = {}) {
   // 2. TEAM_PROPOSAL Phase Operation & Pre-Proposal Lobbying via Chat
   if (phase === 'TEAM_PROPOSAL') {
     const wantsConfirm =
-      /(가자|출발|확정|제안|꾸리자|보내자|결정|고고|propose|confirm|submit|lock|go\b|let'?s\s*go)/i.test(
+      /(가자|출발|확정|제안|꾸리자|보내자|결정|고고|진행|올려|락인|propose|confirm|submit|lock|go\b|let'?s\s*go)/i.test(
         text
       );
+    const wantsVoteNow =
+      /^(투표\s*(시작|하자|가자|콜|진행|고고)?|바로\s*투표|투표할래|call\s*vote|start\s*vote|vote\s*now|let'?s\s*vote)$/i.test(
+        text
+      );
+    const mentionedIds = extractPlayerIdsFromChat(text);
+
+    // If user types "투표 시작" while still in TEAM_PROPOSAL, lock proposal and jump straight to TEAM_VOTE
+    if (wantsVoteNow) {
+      await triggerTeamProposal([...state.selectedProposalIds], text);
+      if (state.board?.phase === 'DISCUSSION') {
+        await triggerCallVotePhase(null);
+      }
+      return;
+    }
 
     if (state.board?.leaderId !== 'player_human') {
-      // If user explicitly asks the AI Leader to lock in the proposal right now
-      if (/^(제안|팀\s*제안|확정|출발|결정|고고|propose|propose\s*team|lock\s*in)$/i.test(text)) {
-        await triggerTeamProposal([], text);
+      // If user asks to propose/confirm or pitches a lineup with "가자/출발/확정/제안", have AI Leader lock in the proposal now
+      if (
+        wantsConfirm ||
+        /^(제안|팀\s*제안|확정|출발|결정|고고|propose|propose\s*team|lock\s*in)$/i.test(text)
+      ) {
+        await triggerTeamProposal(mentionedIds, text);
         return;
       }
       if (/^(다음|다음\s*턴|패스|넘어가자|계속|next|next\s*turn|skip|pass)$/i.test(text)) {
@@ -1473,8 +1640,6 @@ async function handleHumanChatSubmission(rawText, options = {}) {
       await triggerDiscussionStep(text, { isAutoStep: false });
       return;
     }
-
-    const mentionedIds = extractPlayerIdsFromChat(text);
 
     if (mentionedIds.length >= requiredSize) {
       const teamIds = mentionedIds.slice(0, requiredSize);
@@ -1536,15 +1701,21 @@ async function handleHumanChatSubmission(rawText, options = {}) {
   // 3. DISCUSSION Phase Operation via Chat
   if (phase === 'DISCUSSION') {
     // Quick 1-step "call vote + approve" from discussion
-    if (/^(바로\s*찬성|즉시\s*찬성|투표\s*찬성|찬성\s*투표|approve\s*team|vote\s*approve)$/i.test(text)) {
-      await triggerCallVotePhase(text);
-      await triggerSubmitVote('APPROVE', null);
+    if (
+      /^(바로\s*찬성|즉시\s*찬성|투표\s*찬성|찬성\s*투표|찬성|동의|승인|오케이|approve|approve\s*team|vote\s*approve|yes|ok)$/i.test(
+        text
+      )
+    ) {
+      await triggerSubmitVote('APPROVE', text);
       return;
     }
     // Quick 1-step "call vote + reject" from discussion
-    if (/^(바로\s*반대|즉시\s*반대|투표\s*반대|반대\s*투표|reject\s*team|vote\s*reject)$/i.test(text)) {
-      await triggerCallVotePhase(text);
-      await triggerSubmitVote('REJECT', null);
+    if (
+      /^(바로\s*반대|즉시\s*반대|투표\s*반대|반대\s*투표|반대|거부|거절|기각|reject|reject\s*team|vote\s*reject|no|veto)$/i.test(
+        text
+      )
+    ) {
+      await triggerSubmitVote('REJECT', text);
       return;
     }
     // Transition to TEAM_VOTE
@@ -1610,13 +1781,15 @@ async function handleHumanChatSubmission(rawText, options = {}) {
  * @param {string|null} [humanChatText=null]
  */
 async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
-  if (!state.gameId) return;
+  if (!state.gameId || state.board?.phase !== 'TEAM_PROPOSAL') return;
   abortPendingAutoStep();
   stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.phaseActionStatusText = `👑 Locking in Quest ${state.board?.currentQuestNumber || ''} Team Proposal...`;
+  renderPhaseActionBanner();
   try {
     const res = await fetch(`/api/game/${state.gameId}/propose`, {
       method: 'POST',
@@ -1630,6 +1803,7 @@ async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
     const data = await res.json();
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    state.phaseActionStatusText = null;
     if (res.ok) {
       applyServerGameState(data);
       state.lastTurnFinishedAt = Date.now();
@@ -1637,21 +1811,29 @@ async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
         await drainPendingHumanChatQueue();
         return;
       }
-      // Never synthesize robot speech for the human guest — play AI Leader or MC Jae-ho's announcement
+      // Never synthesize robot speech for the human guest — play AI Leader or MC Jae-ho's announcement non-blockingly
       const turnToPlay =
         data.leaderTurn && data.leaderTurn.speakerId !== 'player_human'
           ? data.leaderTurn
           : data.mcTurn || data.latestTurn;
       if (turnToPlay && turnToPlay.speakerId !== 'player_human') {
-        await playTurnVoiceAndHighlight(turnToPlay);
+        void playTurnVoiceAndHighlight(turnToPlay);
       }
-      state.lastTurnFinishedAt = Date.now();
+    } else {
+      renderPhaseActionBanner();
     }
   } catch (err) {
     console.error('Proposal error:', err);
   } finally {
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.phaseActionStatusText) {
+      state.phaseActionStatusText = null;
+      renderPhaseActionBanner();
+    }
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -1659,7 +1841,7 @@ async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
  * Advances one live 6-Agent Multi-Agent Debate or Pre-Proposal Lobbying step
  * during `TEAM_PROPOSAL` or `DISCUSSION`.
  * Supports simultaneous Mic Clash & Polite Yield (`data.yieldTurn` -> `data.latestTurn`)
- * and abortable background polling (`options.isAutoStep`).
+ * and abortable requests so user phase buttons always take immediate priority.
  * @param {string|null} [humanMessage=null]
  * @param {{ isAutoStep?: boolean }} [options]
  */
@@ -1691,7 +1873,8 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
     updateTimerDisplay();
   }
 
-  const abortController = isAutoStep ? new AbortController() : null;
+  // Attach AbortController to all non-human discussion steps so phase buttons (Start Vote / Approve / Reject) preempt immediately
+  const abortController = !humanMessage ? new AbortController() : null;
   if (abortController) {
     state.autoStepAbortController = abortController;
   }
@@ -1737,15 +1920,17 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
         await drainPendingHumanChatQueue();
         return;
       }
-      if (data.yieldTurn) {
-        state.activeClashYielderId = data.yieldTurn.speakerId;
-        await playTurnVoiceAndHighlight(data.yieldTurn);
-        state.activeClashYielderId = null;
-      }
-      if (data.latestTurn && state.pendingHumanChatQueue.length === 0) {
-        await playTurnVoiceAndHighlight(data.latestTurn);
-      }
-      state.lastTurnFinishedAt = Date.now();
+      void (async () => {
+        if (data.yieldTurn) {
+          state.activeClashYielderId = data.yieldTurn.speakerId;
+          await playTurnVoiceAndHighlight(data.yieldTurn);
+          state.activeClashYielderId = null;
+        }
+        if (data.latestTurn && state.pendingHumanChatQueue.length === 0) {
+          await playTurnVoiceAndHighlight(data.latestTurn);
+        }
+        state.lastTurnFinishedAt = Date.now();
+      })();
     }
   } catch (err) {
     if (err?.name !== 'AbortError') {
@@ -1757,6 +1942,9 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
     }
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -1772,6 +1960,8 @@ async function triggerCallVotePhase(humanChatText = null) {
 
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.phaseActionStatusText = '🗳️ Opening 7-player Team Vote...';
+  renderPhaseActionBanner();
   try {
     const res = await fetch(`/api/game/${state.gameId}/call-vote`, {
       method: 'POST',
@@ -1781,15 +1971,25 @@ async function triggerCallVotePhase(humanChatText = null) {
     const data = await res.json();
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    state.phaseActionStatusText = null;
     if (res.ok) {
       applyServerGameState(data);
       state.lastTurnFinishedAt = Date.now();
+    } else {
+      renderPhaseActionBanner();
     }
   } catch (err) {
     console.error('Call vote error:', err);
   } finally {
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.phaseActionStatusText) {
+      state.phaseActionStatusText = null;
+      renderPhaseActionBanner();
+    }
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -1806,6 +2006,8 @@ async function triggerSubmitVote(humanVote = null, humanChatText = null) {
 
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.phaseActionStatusText = `🗳️ Tallying all 7 votes (${humanVote || 'AUTO'})...`;
+  renderPhaseActionBanner();
   try {
     const res = await fetch(`/api/game/${state.gameId}/vote`, {
       method: 'POST',
@@ -1819,29 +2021,38 @@ async function triggerSubmitVote(humanVote = null, humanChatText = null) {
     const data = await res.json();
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    state.phaseActionStatusText = null;
     if (res.ok) {
       applyServerGameState(data);
       state.lastTurnFinishedAt = Date.now();
       if (data.latestTurn && data.latestTurn.speakerId !== 'player_human') {
-        await playTurnVoiceAndHighlight(data.latestTurn);
+        void playTurnVoiceAndHighlight(data.latestTurn);
       }
-      state.lastTurnFinishedAt = Date.now();
       if (
-        state.board.phase === 'QUEST_EXECUTION' &&
+        state.board?.phase === 'QUEST_EXECUTION' &&
         !state.board.proposedTeamIds.includes('player_human')
       ) {
         setTimeout(() => {
           if (state.board?.phase === 'QUEST_EXECUTION') {
             triggerSubmitQuestCard('SUCCESS');
           }
-        }, 1200);
+        }, 800);
       }
+    } else {
+      renderPhaseActionBanner();
     }
   } catch (err) {
     console.error('Vote submission error:', err);
   } finally {
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.phaseActionStatusText) {
+      state.phaseActionStatusText = null;
+      renderPhaseActionBanner();
+    }
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -1851,13 +2062,15 @@ async function triggerSubmitVote(humanVote = null, humanChatText = null) {
  * @param {string|null} [humanChatText=null]
  */
 async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS', humanChatText = null) {
-  if (!state.gameId) return;
+  if (!state.gameId || state.board?.phase !== 'QUEST_EXECUTION') return;
   abortPendingAutoStep();
   stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.phaseActionStatusText = `⚔️ Resolving Quest ${state.board?.currentQuestNumber || ''} outcome...`;
+  renderPhaseActionBanner();
   try {
     const res = await fetch(`/api/game/${state.gameId}/quest`, {
       method: 'POST',
@@ -1871,29 +2084,38 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS', humanChatText 
     const data = await res.json();
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    state.phaseActionStatusText = null;
     if (res.ok) {
       applyServerGameState(data);
       state.lastTurnFinishedAt = Date.now();
       if (data.latestTurn && data.latestTurn.speakerId !== 'player_human') {
-        await playTurnVoiceAndHighlight(data.latestTurn);
+        void playTurnVoiceAndHighlight(data.latestTurn);
       }
-      state.lastTurnFinishedAt = Date.now();
       if (
-        state.board.phase === 'ASSASSIN_PHASE' &&
+        state.board?.phase === 'ASSASSIN_PHASE' &&
         state.humanPrivateView?.self?.roleId !== 'ASSASSIN'
       ) {
         setTimeout(() => {
           if (state.board?.phase === 'ASSASSIN_PHASE') {
             triggerAssassination(null);
           }
-        }, 1500);
+        }, 1000);
       }
+    } else {
+      renderPhaseActionBanner();
     }
   } catch (err) {
     console.error('Quest execution error:', err);
   } finally {
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.phaseActionStatusText) {
+      state.phaseActionStatusText = null;
+      renderPhaseActionBanner();
+    }
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -1903,13 +2125,15 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS', humanChatText 
  * @param {string|null} [humanChatText=null]
  */
 async function triggerAssassination(targetPlayerId = null, humanChatText = null) {
-  if (!state.gameId) return;
+  if (!state.gameId || state.board?.phase !== 'ASSASSIN_PHASE') return;
   abortPendingAutoStep();
   stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
   state.isWaitingServer = true;
+  state.phaseActionStatusText = '🗡️ Resolving Assassin Final Shot...';
+  renderPhaseActionBanner();
   try {
     const res = await fetch(`/api/game/${state.gameId}/assassinate`, {
       method: 'POST',
@@ -1923,22 +2147,34 @@ async function triggerAssassination(targetPlayerId = null, humanChatText = null)
     const data = await res.json();
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    state.phaseActionStatusText = null;
     if (res.ok) {
       applyServerGameState(data);
       state.lastTurnFinishedAt = Date.now();
-      if (data.assassinTurn) {
-        await playTurnVoiceAndHighlight(data.assassinTurn);
-      }
-      if (data.latestTurn && data.latestTurn.id !== data.assassinTurn?.id) {
-        await playTurnVoiceAndHighlight(data.latestTurn);
-      }
-      state.lastTurnFinishedAt = Date.now();
+      void (async () => {
+        if (data.assassinTurn) {
+          await playTurnVoiceAndHighlight(data.assassinTurn);
+        }
+        if (data.latestTurn && data.latestTurn.id !== data.assassinTurn?.id) {
+          await playTurnVoiceAndHighlight(data.latestTurn);
+        }
+        state.lastTurnFinishedAt = Date.now();
+      })();
+    } else {
+      renderPhaseActionBanner();
     }
   } catch (err) {
     console.error('Assassination error:', err);
   } finally {
     state.isWaitingServer = false;
     state.isBusyRequest = false;
+    if (state.phaseActionStatusText) {
+      state.phaseActionStatusText = null;
+      renderPhaseActionBanner();
+    }
+    if (state.pendingHumanChatQueue.length > 0) {
+      void drainPendingHumanChatQueue();
+    }
   }
 }
 
@@ -2508,25 +2744,14 @@ function startAutonomousPhaseTimer() {
       renderHeaderBoard();
 
       if (state.board.leaderId === 'player_human') {
-        // Human is Leader: all 6 AI Idols actively lobby ("Pick me!", "Don't take X!") until Human proposes or 45s ends
+        // Human is Leader: AI Idols lobby while waiting for the Human Leader to lock the team
         if (isFloorIdle && msSinceLastTurnFinished >= 2400 && state.localPhaseRemainingSec > 4) {
           state.lastAutoBeatSec = state.discussionElapsedSec;
           triggerDiscussionStep(null, { isAutoStep: true });
         }
-      } else {
-        // AI Idol is Leader: run 1 pre-proposal lobbying turn from the other 5 idols, then guarantee AI Leader proposal
-        const lobbyCount = state.proposalLobbyCount || 0;
-        if (lobbyCount < 1 && state.localPhaseRemainingSec > 25) {
-          if (isFloorIdle && msSinceLastTurnFinished >= 1400) {
-            state.lastAutoBeatSec = state.discussionElapsedSec;
-            triggerDiscussionStep(null, { isAutoStep: true });
-          }
-        } else if (
-          isFloorIdle &&
-          (msSinceLastTurnFinished >= 1400 || state.localPhaseRemainingSec <= 25)
-        ) {
-          triggerTeamProposal([]);
-        }
+      } else if (isFloorIdle && msSinceLastTurnFinished >= 1200) {
+        // AI Idol is Leader: immediately propose and lock the Quest team to enter DISCUSSION
+        triggerTeamProposal([]);
       }
     } else if (state.board.phase === 'DISCUSSION') {
       if (!state.isWaitingServer) {
@@ -2534,15 +2759,35 @@ function startAutonomousPhaseTimer() {
       }
       renderHeaderBoard();
 
-      if (isFloorIdle && msSinceLastTurnFinished >= 2400 && state.localPhaseRemainingSec > 4) {
+      const discussionTurns = state.board.discussionTurnCountThisRound || 0;
+      if (discussionTurns >= 4) {
+        // After 4 idol cross-examination turns, automatically open TEAM_VOTE
+        if (isFloorIdle && msSinceLastTurnFinished >= 1800) {
+          triggerCallVotePhase();
+        }
+      } else if (isFloorIdle && msSinceLastTurnFinished >= 2400 && state.localPhaseRemainingSec > 2) {
         state.lastAutoBeatSec = state.discussionElapsedSec;
         triggerDiscussionStep(null, { isAutoStep: true });
+      }
+    } else if (state.board.phase === 'QUEST_EXECUTION') {
+      const isHumanOnTeam = state.board.proposedTeamIds.includes('player_human');
+      if (!isHumanOnTeam && isFloorIdle && msSinceLastTurnFinished >= 1200) {
+        triggerSubmitQuestCard('SUCCESS');
+      }
+    } else if (state.board.phase === 'ASSASSIN_PHASE') {
+      const isHumanAssassin = state.humanPrivateView?.self?.roleId === 'ASSASSIN';
+      if (!isHumanAssassin && isFloorIdle && msSinceLastTurnFinished >= 1200) {
+        triggerAssassination(null);
       }
     }
 
     updateTimerDisplay();
 
-    if (state.localPhaseRemainingSec <= 0 && !state.isBusyRequest && !state.isWaitingServer) {
+    if (
+      state.localPhaseRemainingSec <= 0 &&
+      !state.isBusyRequest &&
+      (!state.isWaitingServer || Boolean(state.currentStepAbortController))
+    ) {
       const phase = state.board.phase;
       if (phase === 'TEAM_PROPOSAL') {
         triggerTeamProposal([...state.selectedProposalIds]);

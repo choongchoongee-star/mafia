@@ -215,12 +215,16 @@ app.get('/api/game/:gameId/state', (req, res) => {
  * Executes the Leader's Quest Team Proposal (`45s` timer) and transitions to `DISCUSSION` (`180s` timer).
  */
 app.post('/api/game/:gameId/propose', async (req, res) => {
-  try {
-    const game = activeGames.get(req.params.gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game session not found' });
-    }
+  const game = activeGames.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game session not found' });
+  }
+  if (game.phase !== 'TEAM_PROPOSAL' || game.inFlightPhaseAction) {
+    return res.json(buildClientResponse(game));
+  }
 
+  game.inFlightPhaseAction = 'PROPOSE';
+  try {
     const { proposedTeamIds, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let latestTurn = null;
@@ -276,6 +280,8 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
     );
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to propose team' });
+  } finally {
+    game.inFlightPhaseAction = null;
   }
 });
 
@@ -285,7 +291,7 @@ app.post('/api/game/:gameId/propose', async (req, res) => {
  */
 app.post('/api/game/:gameId/discuss/step', async (req, res) => {
   let clientAborted = false;
-  req.on('close', () => {
+  res.on('close', () => {
     if (!res.writableEnded) {
       clientAborted = true;
     }
@@ -302,8 +308,7 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       targetMemberId = null,
       elapsedRoundSec = 0,
       candidateTeamIds = [],
-      skipTts,
-      isAutoStep = false
+      skipTts
     } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     let humanStoredTurn = null;
@@ -327,6 +332,13 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       });
     }
 
+    if (
+      !humanStoredTurn &&
+      (game.inFlightPhaseAction || (game.phase !== 'DISCUSSION' && game.phase !== 'TEAM_PROPOSAL'))
+    ) {
+      return res.status(204).end();
+    }
+
     const prevSpeakerHistoryLen = game.speakerHistoryThisRound.length;
     const aiDebateTurn = await generateDiscussionDebateTurn(game, {
       humanMessage: humanStoredTurn ? humanStoredTurn.text : null,
@@ -335,11 +347,12 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       candidateTeamIds: Array.isArray(candidateTeamIds) ? candidateTeamIds : []
     });
 
-    // If this was a background auto-step and the client aborted it to prioritize a human action, discard cleanly
+    // If the client aborted this discussion turn to prioritize a phase transition or the phase already advanced, discard cleanly
     if (
-      isAutoStep &&
       !humanStoredTurn &&
-      (clientAborted || (game.phase !== 'DISCUSSION' && game.phase !== 'TEAM_PROPOSAL'))
+      (clientAborted ||
+        game.inFlightPhaseAction ||
+        (game.phase !== 'DISCUSSION' && game.phase !== 'TEAM_PROPOSAL'))
     ) {
       game.speakerHistoryThisRound.length = prevSpeakerHistoryLen;
       return res.status(204).end();
@@ -374,22 +387,62 @@ app.post('/api/game/:gameId/call-vote', (req, res) => {
   if (!game) {
     return res.status(404).json({ error: 'Game session not found' });
   }
+  if (game.phase === 'TEAM_VOTE') {
+    return res.json(buildClientResponse(game));
+  }
+  if (game.phase === 'TEAM_PROPOSAL' || !Array.isArray(game.proposedTeamIds) || game.proposedTeamIds.length === 0) {
+    lockTeamProposal(game, []);
+  }
+  if (game.phase !== 'DISCUSSION') {
+    return res.json(buildClientResponse(game));
+  }
+
   const { humanChatText = null } = req.body || {};
   if (humanChatText) {
     recordHumanChatCommandTurn(game, humanChatText, `Quest ${game.currentQuestNumber} Call Vote`);
   }
   startTeamVotePhase(game);
-  return res.json(buildClientResponse(game));
+  const teamNames = game.proposedTeamIds.map((id) => getPlayerName(game, id));
+  const mcVoteCallTurn = appendTranscriptItem(game, {
+    speakerId: 'mc_jaesuk',
+    text: `자, 이제 ${getPlayerName(game, game.leaderId)} 님의 Quest ${game.currentQuestNumber} 원정대 [${teamNames.join(', ')}] 찬반 투표를 진행합니다! 상단 버튼이나 채팅으로 찬성(✅ Approve) 또는 반대(❌ Reject)를 선택해 주세요!`,
+    emotion: 'speaking',
+    innerThought: `Transitioned to TEAM_VOTE for Quest ${game.currentQuestNumber} [${teamNames.join(', ')}].`,
+    modelUsed: 'gemini-4-argon',
+    thinkingLevel: 'low',
+    verificationPassed: true,
+    verificationNote: '✅ Verified: Team Vote phase opened.'
+  });
+  return res.json(buildClientResponse(game, { latestTurn: mcVoteCallTurn }));
 });
 
 /**
  * Resolves the simultaneous 7-player Team Vote (`APPROVE` vs `REJECT`).
+ * Supports 1-click direct voting from `DISCUSSION` as well as `TEAM_VOTE`.
  */
 app.post('/api/game/:gameId/vote', async (req, res) => {
+  const game = activeGames.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game session not found' });
+  }
+  if (
+    game.inFlightPhaseAction ||
+    (game.phase !== 'TEAM_VOTE' && game.phase !== 'DISCUSSION' && game.phase !== 'TEAM_PROPOSAL')
+  ) {
+    return res.json(buildClientResponse(game));
+  }
+
+  game.inFlightPhaseAction = 'VOTE';
   try {
-    const game = activeGames.get(req.params.gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game session not found' });
+    if (
+      game.phase === 'TEAM_PROPOSAL' ||
+      !Array.isArray(game.proposedTeamIds) ||
+      game.proposedTeamIds.length === 0
+    ) {
+      lockTeamProposal(game, []);
+    }
+    if (game.phase === 'DISCUSSION') {
+      startTeamVotePhase(game);
     }
 
     const { humanVote = null, skipTts, humanChatText = null } = req.body || {};
@@ -411,6 +464,8 @@ app.post('/api/game/:gameId/vote', async (req, res) => {
     );
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to resolve votes' });
+  } finally {
+    game.inFlightPhaseAction = null;
   }
 });
 
@@ -418,12 +473,16 @@ app.post('/api/game/:gameId/vote', async (req, res) => {
  * Executes the secret Quest Mission for the N players on the approved Quest Team.
  */
 app.post('/api/game/:gameId/quest', async (req, res) => {
-  try {
-    const game = activeGames.get(req.params.gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game session not found' });
-    }
+  const game = activeGames.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game session not found' });
+  }
+  if (game.inFlightPhaseAction || game.phase !== 'QUEST_EXECUTION') {
+    return res.json(buildClientResponse(game));
+  }
 
+  game.inFlightPhaseAction = 'QUEST';
+  try {
     const { humanQuestCard = null, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     if (humanChatText) {
@@ -443,6 +502,8 @@ app.post('/api/game/:gameId/quest', async (req, res) => {
     );
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to execute quest' });
+  } finally {
+    game.inFlightPhaseAction = null;
   }
 });
 
@@ -450,12 +511,16 @@ app.post('/api/game/:gameId/quest', async (req, res) => {
  * Executes the Assassin's Final Shot at Merlin when Good passes 3 Quests.
  */
 app.post('/api/game/:gameId/assassinate', async (req, res) => {
-  try {
-    const game = activeGames.get(req.params.gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game session not found' });
-    }
+  const game = activeGames.get(req.params.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game session not found' });
+  }
+  if (game.inFlightPhaseAction || game.phase !== 'ASSASSIN_PHASE') {
+    return res.json(buildClientResponse(game));
+  }
 
+  game.inFlightPhaseAction = 'ASSASSINATE';
+  try {
     const { targetPlayerId = null, skipTts, humanChatText = null } = req.body || {};
     if (typeof skipTts === 'boolean') game.skipTts = skipTts;
     if (humanChatText) {
@@ -497,6 +562,8 @@ app.post('/api/game/:gameId/assassinate', async (req, res) => {
     );
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to resolve assassination' });
+  } finally {
+    game.inFlightPhaseAction = null;
   }
 });
 

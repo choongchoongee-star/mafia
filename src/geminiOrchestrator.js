@@ -895,8 +895,8 @@ ${
 }`
 }
 
-MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
-- Speak in natural, sharp, conversational English — 1 to 2 sentences (20-38 words).
+MANDATORY AVALON PROGRESSION & SMOOTH SPEECH RULES:
+- Speak in ONE crisp, natural, fast-paced English sentence (14-24 words max) with NO square brackets, NO slashes, and NO em-dashes so TTS voice synthesis is 100% fluid and never pauses mid-sentence.
 - 100% OF YOUR LINE MUST PROGRESS THE AVALON GAME: Every turn must include (1) a direct reaction to ${humanMessage ? humanPlayer.name : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id ? lastAiTurn.speakerName : `Leader ${winnerPrivateView.boardSummary.leaderName}`}, (2) a concrete roster pick or explicit APPROVE / REJECT stance on the current team with a round-accurate Avalon reason, and (3) a direct question or call-to-vote.
 - ZERO OFF-TOPIC TALK: NEVER mention food, snacks, drinks, restaurants, or non-game hobbies. Your persona is expressed through your tone and deduction style, NOT by talking about food.
 - NEVER use the word "Aigoo" or "Aigo", and never repeat opening catchphrases that already appeared in Recent Live Conversation.
@@ -904,7 +904,7 @@ MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
 - Return ONLY valid JSON:
 {
   "innerThought": "Your private internal Avalon role strategy & how you are reacting to ${humanMessage ? humanPlayer.name : lastAiTurn ? lastAiTurn.speakerName : 'the board'} as ${winnerPrivateView.self.roleName}",
-  "text": "Your spoken dialogue on the call",
+  "text": "Your spoken 1-sentence dialogue on the call (14-24 words, no brackets)",
   "emotion": "speaking" | "suspicious" | "shocked",
   "targetPlayerId": "player_id_you_are_questioning_or_addressing"
 }`;
@@ -923,50 +923,43 @@ MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
     targetPlayerId: parsed?.targetPlayerId || winnerBid.draft.targetPlayerId
   };
 
-  // If a mic collision happened and the LLM didn't mention the yielder's name, prepend a natural handoff acknowledgment
-  if (
-    yielderBid &&
-    !new RegExp(`\\b${yielderBid.speakerName}\\b`, 'i').test(rawDraft.text)
-  ) {
-    rawDraft.text = prependCollisionHandoffPhrase(
-      winnerIdol,
-      yielderBid.speakerName,
-      rawDraft.text
+  // Guarantee a speaker never repeats or restarts an identical line they already spoke earlier in the transcript
+  const alreadySpokenSameText = game.transcript.some(
+    (t) =>
+      t.speakerId === winnerIdol.id &&
+      String(t.text || '').trim().toLowerCase() === String(rawDraft.text || '').trim().toLowerCase()
+  );
+  if (alreadySpokenSameText) {
+    const fallbackTargetName = getPlayerName(game, rawDraft.targetPlayerId || game.leaderId);
+    rawDraft.text = stylizeWithIdolDialect(
+      winnerIdol.id,
+      `Following up on the Quest ${activeQuest.questNumber} debate for [${proposedNames.join(', ') || `${activeQuest.teamSize} seats`}], let's lock our final votes now—${fallbackTargetName}, what is your final decision?`,
+      fallbackTargetName,
+      game.transcript.length + 1
     );
   }
 
   const verified = await verifyAndHealUtterance(game, winnerIdol.id, rawDraft);
-  const [ttsPayload, yieldTts] = await Promise.all([
-    synthesizeSpeechTTS({
-      speakerId: winnerIdol.id,
-      voiceName: winnerIdol.voiceName,
-      text: verified.text,
-      skipTts: Boolean(game?.skipTts)
-    }),
-    yieldTtsPromise || Promise.resolve(null)
-  ]);
-
-  if (yieldTurnPayload && yieldTts) {
-    Object.assign(yieldTurnPayload, yieldTts);
-  }
+  const ttsPayload = await synthesizeSpeechTTS({
+    speakerId: winnerIdol.id,
+    voiceName: winnerIdol.voiceName,
+    text: verified.text,
+    skipTts: Boolean(game?.skipTts)
+  });
 
   const replyToSpeakerId = humanMessage
     ? humanPlayer.id
-    : yielderBid
-      ? yielderBid.speakerId
-      : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
-        ? lastAiTurn.speakerId
-        : game.leaderId !== winnerIdol.id
-          ? game.leaderId
-          : null;
+    : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+      ? lastAiTurn.speakerId
+      : game.leaderId !== winnerIdol.id
+        ? game.leaderId
+        : null;
   const replyToSpeakerName = replyToSpeakerId ? getPlayerName(game, replyToSpeakerId) : null;
   const replyToSnippet = humanMessage
     ? String(humanMessage).slice(0, 48)
-    : yielderBid && yieldTurnPayload
-      ? String(yieldTurnPayload.text).slice(0, 48)
-      : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
-        ? String(lastAiTurn.text).slice(0, 48)
-        : null;
+    : lastAiTurn && lastAiTurn.speakerId !== winnerIdol.id
+      ? String(lastAiTurn.text).slice(0, 48)
+      : null;
   const targetPlayerName = verified.targetPlayerId
     ? getPlayerName(game, verified.targetPlayerId)
     : null;
@@ -974,11 +967,7 @@ MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
   return {
     speakerId: winnerIdol.id,
     dialectTag: winnerIdol.dialectTag,
-    floorEventType: yielderBid
-      ? 'MIC_CLASH_WINNER'
-      : winnerBid.intent === 'INTERRUPT'
-        ? 'URGENT_INTERRUPT'
-        : 'SPEAK',
+    floorEventType: 'SPEAK',
     ...verified,
     targetPlayerName,
     replyToSpeakerId,
@@ -989,7 +978,7 @@ MANDATORY AVALON PROGRESSION & ANTI-REPETITION RULES:
     ...ttsPayload,
     videoUrl: null,
     videoTaskId: null,
-    yieldTurn: yieldTurnPayload,
+    yieldTurn: null,
     floorEvent,
     agentBids: game.lastAgentBids
   };
@@ -1041,8 +1030,9 @@ function getIdolMentionOrderInMessage(humanMessage, game, idolId) {
 }
 
 /**
- * Evaluates a single AI Idol NPC agent's independent floor bid (`INTERRUPT` | `SPEAK` | `HOLD_SILENT`)
+ * Evaluates a single AI Idol NPC agent's independent floor bid (`SPEAK` | `HOLD_SILENT`)
  * conditioned strictly on her isolated `PrivatePlayerView` (secret role, night vision, Bayesian suspicion, and persona).
+ * Enforces orderly round-robin turn fairness (`minTimesSpoken`) so agents never interrupt or ping-pong.
  */
 async function evaluateSingleIdolFloorBid(
   game,
@@ -1055,7 +1045,8 @@ async function evaluateSingleIdolFloorBid(
     lastTargetId,
     lastAiTurn = null,
     effectiveTeamIds = [],
-    isPreProposalPhase = false
+    isPreProposalPhase = false,
+    minTimesSpoken = 0
   }
 ) {
   const privateView = buildPrivatePlayerView(game, idol.id);
@@ -1087,7 +1078,7 @@ async function evaluateSingleIdolFloorBid(
     lastAiTurn
   );
 
-  // Compute strategic urgency & intent based on secret Avalon role + situational triggers
+  // Compute strategic urgency & intent based on secret Avalon role + orderly round-robin fairness
   let urgency = 50;
   let intent = 'SPEAK';
   let strategicSilenceThought = null;
@@ -1098,23 +1089,28 @@ async function evaluateSingleIdolFloorBid(
     if (justSpokeLast && mentionOrder > 0) {
       urgency = 91;
     }
-    intent = 'INTERRUPT';
+    intent = 'SPEAK';
   } else if (justSpokeLast) {
-    urgency = 16;
+    urgency = 12;
     intent = 'HOLD_SILENT';
     strategicSilenceThought = `As ${role.roleName}, I just spoke on the last beat—holding strategic silence now to watch how the table reacts to my point.`;
+  } else if (timesSpokenThisRound > minTimesSpoken) {
+    // Orderly Turn Rotation: let idols who haven't spoken yet this round take the mic first!
+    urgency = Math.max(14, 34 - (timesSpokenThisRound - minTimesSpoken) * 8);
+    intent = 'HOLD_SILENT';
+    strategicSilenceThought = `As ${role.roleName}, I already spoke this round—letting the other cast members share their reads in orderly turn before I speak again.`;
   } else if (wasJustAccusedOrAddressed) {
-    urgency = 89;
-    intent = 'INTERRUPT';
+    urgency = 88;
+    intent = 'SPEAK';
   } else {
-    // Role-specific strategic floor calculation
+    // Role-specific strategic floor calculation among idols on the current rotation tier
     if (role.roleId === 'MERLIN') {
       const evilOnTeam = proposedIds.some((id) =>
         privateView.epistemicVision.knownEvilIds.includes(id)
       );
       if (evilOnTeam && timesSpokenThisRound === 0) {
         urgency = 84;
-        intent = 'INTERRUPT';
+        intent = 'SPEAK';
       } else if (timesSpokenThisRound >= 1) {
         urgency = 28;
         intent = 'HOLD_SILENT';
@@ -1128,22 +1124,20 @@ async function evaluateSingleIdolFloorBid(
         privateView.epistemicVision.merlinCandidateIds.includes(id)
       );
       urgency = candidateOnTeam ? 78 : 58;
-      intent = urgency >= 76 ? 'INTERRUPT' : 'SPEAK';
+      intent = 'SPEAK';
     } else if (role.alignment === 'EVIL') {
       const evilOnTeam = proposedIds.some(
         (id) =>
           id === idol.id ||
           privateView.epistemicVision.knownEvilTeammateIds.includes(id)
       );
-      // If Evil is already on the team and Good players are arguing with each other, Evil often holds strategic silence!
       if (evilOnTeam && timesSpokenThisRound >= 1) {
         urgency = 24;
         intent = 'HOLD_SILENT';
-        strategicSilenceThought = `As ${role.roleName} (Evil), our Evil Saboteur is already inside the proposed team! I'm holding strategic silence ("가만히 있으면서 미소 짓기") while the Good Citizens fight each other.`;
+        strategicSilenceThought = `As ${role.roleName} (Evil), our Evil Saboteur is already inside the proposed team! I'm holding strategic silence while the Good Citizens debate.`;
       } else if (!evilOnTeam && timesSpokenThisRound === 0) {
-        // Evil locked out of the team wants to interrupt and torpedo the proposal!
         urgency = 83;
-        intent = 'INTERRUPT';
+        intent = 'SPEAK';
       } else {
         urgency = 64;
         intent = 'SPEAK';
@@ -1152,7 +1146,7 @@ async function evaluateSingleIdolFloorBid(
       // Loyal Servant of Arthur (Good Citizen)
       if (!onTeam && timesSpokenThisRound === 0) {
         urgency = 79;
-        intent = 'INTERRUPT';
+        intent = 'SPEAK';
       } else if (timesSpokenThisRound >= 1) {
         urgency = 31;
         intent = 'HOLD_SILENT';
@@ -1163,24 +1157,21 @@ async function evaluateSingleIdolFloorBid(
       }
     }
 
-    // Persona-specific adjustments (Seol-ah holds silence until sniper shot; Chaerin & Rina jump in aggressively)
+    // Persona-specific adjustments
     if (idol.id === 'idol_sullyoon' && urgency < 78 && timesSpokenThisRound >= 1) {
       urgency = 26;
       intent = 'HOLD_SILENT';
-      strategicSilenceThought = `As ${role.roleName} (Seol-ah, ISFP Homebody Observer), holding quiet deer-eyed silence until someone contradicts the vote math, then I'll snipe them in Busan Satoori.`;
+      strategicSilenceThought = `As ${role.roleName} (Seol-ah, ISFP Homebody Observer), holding quiet deer-eyed silence until someone contradicts the vote math.`;
     } else if (
       (idol.id === 'idol_chaewon' || idol.id === 'idol_karina') &&
       timesSpokenThisRound === 0
     ) {
-      urgency = Math.min(94, urgency + 9);
-      if (urgency >= 76) intent = 'INTERRUPT';
+      urgency = Math.min(92, urgency + 7);
     }
 
-    // Small deterministic-yet-lively jitter per transcript step so different pairs clash naturally
     const stepHash = (game.transcript.length * 17 + idol.seatIndex * 13) % 11;
-    urgency = Math.max(10, Math.min(98, urgency + stepHash - 5));
-    if (urgency >= 76) intent = 'INTERRUPT';
-    else if (urgency < 44) intent = 'HOLD_SILENT';
+    urgency = Math.max(10, Math.min(96, urgency + stepHash - 5));
+    if (urgency < 44) intent = 'HOLD_SILENT';
     else intent = 'SPEAK';
   }
 
@@ -1200,54 +1191,11 @@ async function evaluateSingleIdolFloorBid(
 }
 
 /**
- * Builds the short, natural cut-off & yield line when two idols open their mics simultaneously.
- */
-function buildDialectMicYieldLine(yielderIdol, winnerIdol, intendedText) {
-  const snippet = intendedText.split(/[,.!?]/)[0]?.slice(0, 26) || 'Wait, look at the team';
-  switch (yielderIdol.id) {
-    case 'idol_sullyoon':
-      return `Wait, ${snippet}— oh, sorry ${winnerIdol.name}, we unmuted at the same time. Go ahead first, I'll share my read right after you.`;
-    case 'idol_wonyoung':
-      return `I was just going to say— oh, ${winnerIdol.name}, you unmuted right with me! Go ahead first, I'll follow up right after.`;
-    case 'idol_yuna':
-      return `Hold on, ${snippet}— oh, ${winnerIdol.name} jumped in at the exact same second! Go right ahead, let's hear your point first.`;
-    case 'idol_hanni':
-      return `Wait on, ${snippet}— oh, ${winnerIdol.name} and I just clashed on the mic! You go first, I'll jump in right after.`;
-    case 'idol_karina':
-      return `Wait, check the— hold on, ${winnerIdol.name} and I unmuted together. Make your point first, ${winnerIdol.name}, then I'll break down the votes.`;
-    case 'idol_chaewon':
-    default:
-      return `Hold up— ah, ${winnerIdol.name}, we both grabbed the mic at once! Go ahead and make your point first.`;
-  }
-}
-
-/**
- * Prepends a natural handoff acknowledgment when the winning idol takes the floor after a mic collision.
- */
-function prependCollisionHandoffPhrase(winnerIdol, yielderName, baseText) {
-  switch (winnerIdol.id) {
-    case 'idol_karina':
-      return `Thanks, ${yielderName}. ${baseText}`;
-    case 'idol_chaewon':
-      return `Appreciate it, ${yielderName}. ${baseText}`;
-    case 'idol_hanni':
-      return `Thanks ${yielderName}! ${baseText}`;
-    case 'idol_sullyoon':
-      return `Thank you, ${yielderName}. ${baseText}`;
-    case 'idol_yuna':
-      return `Thanks ${yielderName}~ ${baseText}`;
-    case 'idol_wonyoung':
-    default:
-      return `Thank you, ${yielderName}. ${baseText}`;
-  }
-}
-
-/**
  * Infuses an idol's natural conversational tone into fallback dialogue using a rotating pool
  * without injecting round-inaccurate vote claims or off-topic filler.
  */
-function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone') {
-  const variantIdx = (coreSentence.length + targetName.length) % 4;
+function stylizeWithIdolDialect(speakerId, coreSentence, targetName = 'everyone', turnSeed = 0) {
+  const variantIdx = (coreSentence.length + targetName.length + turnSeed) % 4;
   switch (speakerId) {
     case 'idol_sullyoon': {
       const variants = [
