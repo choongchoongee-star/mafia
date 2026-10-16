@@ -1572,9 +1572,8 @@ async function handleHumanChatSubmission(rawText, options = {}) {
   const text = String(rawText || '').trim();
   if (!text) return;
 
-  // Cancel any in-flight background auto-step and interrupt active TTS playback immediately
+  // Cancel any in-flight background auto-step without interrupting active speaker audio
   abortPendingAutoStep();
-  stopActiveSpeech();
 
   if (!options.skipOptimisticAppend) {
     appendOptimisticHumanChat(text);
@@ -1783,7 +1782,6 @@ async function handleHumanChatSubmission(rawText, options = {}) {
 async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
   if (!state.gameId || state.board?.phase !== 'TEAM_PROPOSAL') return;
   abortPendingAutoStep();
-  stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
@@ -1840,8 +1838,7 @@ async function triggerTeamProposal(proposedTeamIds = [], humanChatText = null) {
 /**
  * Advances one live 6-Agent Multi-Agent Debate or Pre-Proposal Lobbying step
  * during `TEAM_PROPOSAL` or `DISCUSSION`.
- * Supports simultaneous Mic Clash & Polite Yield (`data.yieldTurn` -> `data.latestTurn`)
- * and abortable requests so user phase buttons always take immediate priority.
+ * Enforces strictly sequential, non-interrupting turn-taking.
  * @param {string|null} [humanMessage=null]
  * @param {{ isAutoStep?: boolean }} [options]
  */
@@ -1856,7 +1853,6 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
   const isAutoStep = Boolean(options.isAutoStep && !humanMessage);
   if (humanMessage) {
     abortPendingAutoStep();
-    stopActiveSpeech();
   }
 
   if (state.isBusyRequest) {
@@ -1921,11 +1917,6 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
         return;
       }
       void (async () => {
-        if (data.yieldTurn) {
-          state.activeClashYielderId = data.yieldTurn.speakerId;
-          await playTurnVoiceAndHighlight(data.yieldTurn);
-          state.activeClashYielderId = null;
-        }
         if (data.latestTurn && state.pendingHumanChatQueue.length === 0) {
           await playTurnVoiceAndHighlight(data.latestTurn);
         }
@@ -1955,7 +1946,6 @@ async function triggerDiscussionStep(humanMessage = null, options = {}) {
 async function triggerCallVotePhase(humanChatText = null) {
   if (!state.gameId) return;
   abortPendingAutoStep();
-  stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
@@ -2001,7 +1991,6 @@ async function triggerCallVotePhase(humanChatText = null) {
 async function triggerSubmitVote(humanVote = null, humanChatText = null) {
   if (!state.gameId) return;
   abortPendingAutoStep();
-  stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
@@ -2064,7 +2053,6 @@ async function triggerSubmitVote(humanVote = null, humanChatText = null) {
 async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS', humanChatText = null) {
   if (!state.gameId || state.board?.phase !== 'QUEST_EXECUTION') return;
   abortPendingAutoStep();
-  stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
@@ -2127,7 +2115,6 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS', humanChatText 
 async function triggerAssassination(targetPlayerId = null, humanChatText = null) {
   if (!state.gameId || state.board?.phase !== 'ASSASSIN_PHASE') return;
   abortPendingAutoStep();
-  stopActiveSpeech();
   if (state.isBusyRequest) return;
 
   state.isBusyRequest = true;
@@ -2620,7 +2607,7 @@ function getOrInitAvatarAnimState(id) {
  */
 function startWebcamAnimationLoop() {
   const renderFrame = () => {
-    if (Date.now() > state.activeSpeechEndTime && state.activeSpeakerId) {
+    if (!state.isPlayingAudio && Date.now() > state.activeSpeechEndTime && state.activeSpeakerId) {
       clearActiveSpeakerState();
     }
 
@@ -2732,16 +2719,18 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman }) {
 
 /**
  * 1-Second Autonomous Phase Timer & 6-Agent Parallel Floor Handoff Loop.
- * Pauses phase countdown during server LLM/TTS API requests (`state.isWaitingServer`),
+ * Pauses phase countdown during server LLM/TTS API requests (`state.isWaitingServer`)
+ * or while any character is actively speaking (`state.isPlayingAudio`),
  * runs pre-proposal lobbying during `TEAM_PROPOSAL` with 100% guaranteed team lock-in,
- * and triggers the next 6-Idol parallel floor bid (`Promise.all`) during `DISCUSSION`.
+ * and triggers the next 6-Idol parallel floor bid (`Promise.all`) during `DISCUSSION`
+ * only after the previous speaker finishes 100% of their voice playback (`isFloorIdle`).
  */
 function startAutonomousPhaseTimer() {
   setInterval(() => {
     if (!state.board || state.board.phase === 'GAME_OVER') return;
 
-    // Pause phase countdown while waiting on server LLM/TTS API so latency never penalizes the player
-    if (state.localPhaseRemainingSec > 0 && !state.isWaitingServer) {
+    // Pause phase countdown while waiting on server LLM/TTS API or while a character is actively speaking
+    if (state.localPhaseRemainingSec > 0 && !state.isWaitingServer && !state.isPlayingAudio) {
       state.localPhaseRemainingSec -= 1;
     }
 
@@ -2753,13 +2742,13 @@ function startAutonomousPhaseTimer() {
       !state.activeSpeakerId;
 
     if (state.board.phase === 'TEAM_PROPOSAL') {
-      if (!state.isWaitingServer) {
+      if (!state.isWaitingServer && !state.isPlayingAudio) {
         state.discussionElapsedSec += 1;
       }
       renderHeaderBoard();
 
       if (state.board.leaderId === 'player_human') {
-        // Human is Leader: AI Idols lobby while waiting for the Human Leader to lock the team
+        // Human is Leader: AI Idols lobby one by one while waiting for the Human Leader to lock the team
         if (isFloorIdle && msSinceLastTurnFinished >= 2400 && state.localPhaseRemainingSec > 4) {
           state.lastAutoBeatSec = state.discussionElapsedSec;
           triggerDiscussionStep(null, { isAutoStep: true });
@@ -2769,14 +2758,14 @@ function startAutonomousPhaseTimer() {
         triggerTeamProposal([]);
       }
     } else if (state.board.phase === 'DISCUSSION') {
-      if (!state.isWaitingServer) {
+      if (!state.isWaitingServer && !state.isPlayingAudio) {
         state.discussionElapsedSec += 1;
       }
       renderHeaderBoard();
 
       const discussionTurns = state.board.discussionTurnCountThisRound || 0;
       if (discussionTurns >= 4) {
-        // After 4 idol cross-examination turns, automatically open TEAM_VOTE
+        // After 4 idol cross-examination turns, automatically open TEAM_VOTE once current speaker finishes
         if (isFloorIdle && msSinceLastTurnFinished >= 1800) {
           triggerCallVotePhase();
         }
@@ -2798,11 +2787,7 @@ function startAutonomousPhaseTimer() {
 
     updateTimerDisplay();
 
-    if (
-      state.localPhaseRemainingSec <= 0 &&
-      !state.isBusyRequest &&
-      (!state.isWaitingServer || Boolean(state.autoStepAbortController))
-    ) {
+    if (state.localPhaseRemainingSec <= 0 && isFloorIdle) {
       const phase = state.board.phase;
       if (phase === 'TEAM_PROPOSAL') {
         triggerTeamProposal([...state.selectedProposalIds]);

@@ -121,7 +121,7 @@ export async function callArgonInteraction({
       }
 
       const timeoutMs =
-        thinkingLevel === 'high' ? 3800 : thinkingLevel === 'low' ? 1200 : 1700;
+        thinkingLevel === 'high' ? 1400 : thinkingLevel === 'low' ? 800 : 1100;
       const interaction = await Promise.race([
         client.interactions.create(requestPayload),
         new Promise((_, reject) =>
@@ -146,8 +146,8 @@ export async function callArgonInteraction({
     // Fall through to fast companion model adapter if real-time broadcast turn exceeds latency budget
   }
 
-  // 2. Secondary path: Fast companion models (`gemini-3.8-flash` / `gemini-3.5-flash-lite` / `gemini-2.5-flash`) for sub-1.5s real-time pacing
-  const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+  // 2. Secondary path: Fast companion models (`gemini-2.5-flash` / `gemini-3.8-flash` / `gemini-3.5-flash-lite`) for sub-1.5s real-time pacing
+  const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
   for (const candidateModel of candidateModels) {
     try {
@@ -162,7 +162,7 @@ export async function callArgonInteraction({
           config
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Companion model latency guard')), 2200)
+          setTimeout(() => reject(new Error('Companion model latency guard')), 1600)
         )
       ]);
       const text = response?.text || '';
@@ -514,14 +514,28 @@ function buildActionableBoardFacts(
  * N-player Quest Team based on her isolated Night-Phase knowledge and Bayesian suspicion matrix,
  * and deliver her live justification speech.
  * @param {object} game
+ * @param {string[]} [preferredTeamIds=[]]
  * @returns {Promise<{ proposedTeamIds: string[], speechTurn: object }>}
  */
-export async function generateAiLeaderProposal(game) {
+export async function generateAiLeaderProposal(game, preferredTeamIds = []) {
   const leaderId = game.leaderId;
   const privateView = buildPrivatePlayerView(game, leaderId);
   const activeQuest = getActiveQuest(game);
   const requiredSize = activeQuest.teamSize;
-  const actionableBoardFacts = buildActionableBoardFacts(game, privateView, [], true);
+  const validPlayerIds = new Set(game.players.map((p) => p.id));
+  const cleanPreferredIds = [
+    ...new Set(
+      (Array.isArray(preferredTeamIds) ? preferredTeamIds : []).filter((id) =>
+        validPlayerIds.has(id)
+      )
+    )
+  ].slice(0, requiredSize);
+  const actionableBoardFacts = buildActionableBoardFacts(
+    game,
+    privateView,
+    cleanPreferredIds,
+    true
+  );
 
   const prompt = `You are playing a 7-player game of The Resistance: Avalon on a live K-Pop Variety Show Discord call.
 YOUR IDENTITY & SECRET ROLE:
@@ -535,6 +549,11 @@ CURRENT BOARD STATE & ACTIONABLE FACTS:
 - You are the Leader for Quest ${activeQuest.questNumber} (Requires EXACTLY ${requiredSize} players; ${activeQuest.failsRequired} Fail(s) needed to fail).
 - Score: Good ${privateView.boardSummary.goodScore} vs Evil ${privateView.boardSummary.evilScore} | Reject Track: ${privateView.boardSummary.rejectTrack}/5
 ${actionableBoardFacts}
+${
+  cleanPreferredIds.length > 0
+    ? `- LIVE TABLE SUGGESTION FROM GUEST: Guest just pitched [${cleanPreferredIds.map((id) => getPlayerName(game, id)).join(', ')}] in chat! Unless your secret role vision strictly forbids it, adopt [${cleanPreferredIds.map((id) => getPlayerName(game, id)).join(', ')}] into your ${requiredSize}-player Quest ${activeQuest.questNumber} proposal.`
+    : ''
+}
 - Your Bayesian Evil Suspicion Ranking (Higher = More Suspicious): ${JSON.stringify(privateView.suspicionRanking)}
 - Recent Transcript: ${JSON.stringify(game.transcript.slice(-6).map((t) => ({ speaker: t.speakerName, text: t.text })))}
 
@@ -560,7 +579,20 @@ Return ONLY valid JSON:
   });
 
   const parsed = parseJsonSafely(llmResult.text);
-  let candidateIds = Array.isArray(parsed?.proposedTeamIds) ? parsed.proposedTeamIds : [];
+  let candidateIds = Array.isArray(parsed?.proposedTeamIds)
+    ? [...new Set(parsed.proposedTeamIds.filter((id) => validPlayerIds.has(id)))]
+    : [];
+
+  // If the human guest explicitly pitched a team in chat, honor those seats first
+  if (cleanPreferredIds.length > 0) {
+    const merged = [...cleanPreferredIds];
+    const strategicFill = computeStrategicTeamSelection(game, leaderId, requiredSize);
+    for (const id of [...candidateIds, ...strategicFill]) {
+      if (merged.length >= requiredSize) break;
+      if (!merged.includes(id)) merged.push(id);
+    }
+    candidateIds = merged.slice(0, requiredSize);
+  }
 
   // Strategic deterministic fallback if LLM didn't return exact valid IDs
   if (candidateIds.length !== requiredSize) {
@@ -570,8 +602,10 @@ Return ONLY valid JSON:
   const teamNames = candidateIds.map((id) => getPlayerName(game, id));
   const draftSpeech = {
     text:
-      parsed?.text ||
-      buildDynamicLeaderProposalSpeech(game, privateView, candidateIds, teamNames, activeQuest),
+      cleanPreferredIds.length > 0
+        ? buildDynamicLeaderProposalSpeech(game, privateView, candidateIds, teamNames, activeQuest)
+        : parsed?.text ||
+          buildDynamicLeaderProposalSpeech(game, privateView, candidateIds, teamNames, activeQuest),
     innerThought:
       parsed?.innerThought ||
       buildLeaderInnerThought(privateView, teamNames, activeQuest),
