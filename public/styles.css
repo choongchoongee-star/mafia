@@ -811,81 +811,139 @@ body {
   background: #2b2d31;
 }
 
-/* Context Action Bar (Right side of top bar) */
+/* Context Action Bar (High-Visibility Game Progression HUD on Top Stage) */
 .context-action-bar {
-  background: #1b1c20;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  padding: 5px 8px 5px 15px;
+  background: linear-gradient(135deg, rgba(28, 30, 36, 0.96), rgba(35, 38, 47, 0.96));
+  border: 1.5px solid rgba(88, 101, 242, 0.45);
+  border-radius: 14px;
+  padding: 8px 12px 8px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   flex: 1;
-  min-width: 220px;
-  max-width: 720px;
+  min-width: 260px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(88, 101, 242, 0.12);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.context-action-bar.needs-human-action {
+  border-color: #4ade80;
+  box-shadow: 0 6px 22px rgba(35, 165, 90, 0.28), 0 0 14px rgba(74, 222, 128, 0.22);
+}
+
+.context-instruction-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 180px;
+  flex: 1;
 }
 
 .context-instruction {
-  font-size: 12.5px;
+  font-size: 13px;
+  color: #f3f4f6;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.banner-member-chips,
+.chat-dock-member-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.member-chip-btn {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: #2b2d31;
   color: var(--text-secondary);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.member-chip-btn:hover {
+  background: #383a40;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.member-chip-btn.selected {
+  background: rgba(88, 101, 242, 0.28);
+  color: #fff;
+  border-color: #818cf8;
+  box-shadow: 0 0 8px rgba(88, 101, 242, 0.45);
 }
 
 .context-buttons {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 7px;
   flex-shrink: 0;
 }
 
 .action-cta-btn {
-  padding: 6px 13px;
+  padding: 8px 15px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
+  transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.action-cta-btn:active {
+  transform: scale(0.97);
 }
 
 .action-cta-btn.gold,
 .action-cta-btn.blurple {
-  background: var(--discord-blurple);
+  background: linear-gradient(135deg, #5865f2, #4f46e5);
   color: #fff;
+  border-color: rgba(129, 140, 248, 0.5);
 }
 
 .action-cta-btn.gold:hover,
 .action-cta-btn.blurple:hover {
-  background: var(--discord-blurple-hover);
+  background: linear-gradient(135deg, #4752c4, #4338ca);
+  box-shadow: 0 4px 14px rgba(88, 101, 242, 0.45);
 }
 
 .action-cta-btn.approve {
-  background: var(--discord-green);
+  background: linear-gradient(135deg, #23a55a, #16a34a);
   color: #fff;
+  border-color: rgba(74, 222, 128, 0.55);
 }
 
 .action-cta-btn.approve:hover {
-  background: var(--discord-green-hover);
+  background: linear-gradient(135deg, #1d8a4b, #15803d);
+  box-shadow: 0 4px 14px rgba(35, 165, 90, 0.48);
 }
 
 .action-cta-btn.reject {
-  background: var(--discord-red);
+  background: linear-gradient(135deg, #da373c, #dc2626);
   color: #fff;
+  border-color: rgba(248, 113, 113, 0.55);
 }
 
 .action-cta-btn.reject:hover {
-  background: var(--discord-red-hover);
+  background: linear-gradient(135deg, #b82d31, #b91c1c);
+  box-shadow: 0 4px 14px rgba(218, 55, 60, 0.48);
 }
 
 .action-cta-btn.secondary {
   background: #2b2d31;
   color: var(--text-normal);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .action-cta-btn.secondary:hover {
@@ -1065,19 +1123,23 @@ body {
   right: 10px;
   bottom: 42px;
   z-index: 2;
-  background: rgba(12, 13, 16, 0.82);
+  background: rgba(12, 13, 16, 0.84);
   backdrop-filter: blur(8px);
-  padding: 6px 10px;
+  padding: 0 10px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
   border-radius: 6px;
   font-size: 11.5px;
-  line-height: 1.38;
+  line-height: 16px;
+  max-height: 42px;
   color: #f2f3f5;
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Bottom-Left Participant Name Pill (Matching Reference Image) */
@@ -1448,6 +1510,48 @@ body {
   }
 }
 
+.msg-reply-chain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.reply-pill,
+.target-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.3;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-pill {
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.reply-pill.human-reply {
+  background: rgba(74, 222, 128, 0.16);
+  color: #86efac;
+  border-color: rgba(74, 222, 128, 0.38);
+}
+
+.target-pill {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
 .msg-text {
   font-size: 13px;
   line-height: 1.42;
@@ -1455,14 +1559,73 @@ body {
   word-wrap: break-word;
 }
 
-/* Bottom Discord Chat Composer */
+/* Bottom Discord Chat Composer + Synchronized Game Action Dock */
 .discord-chat-composer {
   padding: 10px 12px 12px 12px;
   background: var(--bg-chat);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-phase-action-dock {
+  background: linear-gradient(135deg, #1b1d23, #232631);
+  border: 1.5px solid rgba(88, 101, 242, 0.48);
+  border-radius: 10px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 7px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+}
+
+.chat-phase-action-dock.needs-human-action {
+  border-color: #4ade80;
+  box-shadow: 0 4px 16px rgba(35, 165, 90, 0.25), 0 0 10px rgba(74, 222, 128, 0.18);
+}
+
+.chat-dock-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.phase-pill {
+  background: var(--discord-blurple);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.chat-dock-instruction {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f3f4f6;
+  line-height: 1.35;
+  flex: 1;
+  min-width: 140px;
+}
+
+.chat-dock-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chat-dock-buttons .action-cta-btn {
+  flex: 1 1 auto;
+  justify-content: center;
+  text-align: center;
+  padding: 7px 11px;
+  font-size: 12px;
 }
 
 .discord-input-box {
