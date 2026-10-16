@@ -59,7 +59,11 @@ npm start
 ```
 Open `http://localhost:8080` in Chrome or Edge.
 
-### Google Cloud Run Deployment
+### Live Google Cloud Run Deployment (`h2gdm-hack26icn-2666`)
+- **Live Cloud Run URL**: [https://idol-avalon-live-oyxmbnqija-du.a.run.app](https://idol-avalon-live-oyxmbnqija-du.a.run.app)
+- **Health & Telemetry Endpoint**: [https://idol-avalon-live-oyxmbnqija-du.a.run.app/api/status](https://idol-avalon-live-oyxmbnqija-du.a.run.app/api/status)
+- **GCP Project / Region**: `h2gdm-hack26icn-2666` / `asia-northeast3` (Seoul)
+
 ```bash
 gcloud run deploy idol-avalon-live \
   --source . \
@@ -67,3 +71,4 @@ gcloud run deploy idol-avalon-live \
   --allow-unauthenticated \
   --port 8080
 ```
+
