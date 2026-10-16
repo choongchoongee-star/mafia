@@ -46,11 +46,11 @@ Every generated AI Idol utterance passes through a two-stage verification loop b
 ---
 
 ## 4. Multimodal Companion Model Pipeline & Operational Lessons
-- **Real Webcam Video Generation (`gemini-omni-1.1-flash`)**:
-  - Invoked with `ai.interactions.create({ model: 'gemini-omni-1.1-flash', input: prompt, background: true })` and polled via `ai.interactions.get(interaction.id)` (passing the string ID directly).
-  - **Prompt Safety Lesson**: Prompts referencing `"K-pop idol"` or celebrity names trigger Prohibited Use filters (`400 Request blocked`). Describing `"a poised 25-year-old Korean female talk show panelist in a modern podcast studio looking into a webcam"` generates clean, photorealistic 16:9 `.mp4` studio webcam feeds (`state.output_video.data`).
-- **4K Studio Portrait Anchors (`gemini-nano-banana-2.1`)**:
-  - Generates photorealistic studio portraits (`public/generated/portrait_*.png`) used as poster frames and fallback anchors.
+- **Fixed 4K Studio Profile Images (`gemini-nano-banana-2.1` / `gemini-3.1-flash-image-preview`)**:
+  - Generates photorealistic 16:9 Korean studio profile images (`public/generated/portrait_*.png`) rendered steadily in each Discord voice/video tile with zero text overlays or camera wobble.
+- **Video Generation Latency Lesson (`gemini-omni-1.1-flash`)**:
+  - Invoked via `ai.interactions.create({ model: 'gemini-omni-1.1-flash', input: prompt, background: true })` and polled via `ai.interactions.get(interaction.id)`.
+  - **Engineering Lesson**: While `gemini-omni-1.1-flash` produces 16:9 studio clips when using non-celebrity prompts (`"a poised 25-year-old Korean female talk show panelist"`), end-to-end video generation latency is too slow for rapid turn-by-turn Mafia/Avalon cross-examinations. We therefore standardized on **Fixed 4K Discord Profile Images (`portrait_*.png`) + Real-Time TTS (`gemini-3.8-flash-tts`) + Discord Green Speaking Rings (`#23a55a`)** for instant debate pacing.
 - **Parallel 6-Idol Team Voting (`gemini-3.8-flash`)**:
   - Executes all 6 AI Idol `APPROVE`/`REJECT` vote decisions in parallel via `Promise.all`.
 - **Expressive Character Voice (`gemini-3.8-flash-tts`) & Live STT (`gemini-3.5-transcribe-live`)**:

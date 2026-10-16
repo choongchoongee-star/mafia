@@ -4,11 +4,11 @@
 **IDOL AVALON LIVE** reimagines the classic 7-player hidden-role social deduction game *The Resistance: Avalon* as a **Discord Voice & Video Party Call (`#avalon-stage-7p`)**. Instead of needing 7–10 human friends online simultaneously to start a Mafia/Avalon lobby, a solo player (or a small group of friends in future multiplayer rooms) drops into a Discord voice channel where **6 Autonomous AI K-Pop Idols** (**Wonyoung, Karina, Sullyoon, Yuna, Chaewon, Hanni**) and **MC Jae-suk** (`[BOT] Moderator`) fill the seats with real-time voice synthesis and epistemic hidden-role reasoning.
 
 Rather than a text-only chatbot, the interface is engineered as an authentic **Discord Stage & Video Call Experience**:
-- **4K Studio Portrait Anchors (`gemini-nano-banana-2.1`) & Optional `.mp4` Cutscene Loops (`gemini-omni-1.1-flash`)**: During our hackathon sprint, we benchmarked live turn-by-turn video generation (`gemini-omni-1.1-flash`) and found that video synthesis latency could not keep up with rapid Mafia/Avalon cross-examinations. To preserve snappy conversational pacing, each Discord video tile anchors on a bespoke 4K portrait (`public/generated/portrait_*.png`) paired with a 60FPS interactive HTML5 `<canvas>` overlay and optional `.mp4` studio webcam loops (`public/generated/webcam_*.mp4`).
-- **60FPS Discord Voice-Activity & Camera HUD (`<canvas>`)**: Layered directly above each character tile (`z-index: 2`, `pointer-events: none`), a 60FPS HTML5 Canvas renders real-time voice-call presence and micro-expressions:
-  - **Discord Green Speaking Ring (`#23a55a`)**: Crisp `3px` active-speaker border and live voice-activity waveform bars driven by `gemini-3.8-flash-tts` audio amplitude.
-  - **Real-Time Phoneme/Viseme Articulation**: Dynamic jaw/lip viseme cues and audio dB telemetry (`🎙️ LIVE [A/O] -6.2dB`) synced to character speech.
-  - **Simultaneous Listener Micro-Reactions**: Non-speaking party members display live reaction pills (`⚡ REACTING`, `🤨 DOUBTING`, `👍 NODDING`, `👀 WATCHING`) during heated accusations.
+- **Fixed 4K Studio Profile Images (`gemini-nano-banana-2.1`)**: During our hackathon sprint, we benchmarked live turn-by-turn video generation (`gemini-omni-1.1-flash`) and found that video synthesis latency could not keep up with rapid Mafia/Avalon cross-examinations. To preserve snappy conversational pacing, each Discord tile renders a crisp, steady 16:9 4K studio profile image (`public/generated/portrait_*.png`) with zero camera wobble or `.mp4` override.
+- **Discord Voice-Activity & Stage Overlays**:
+  - **Discord Green Speaking Ring (`#23a55a`)**: Crisp active-speaker border and live voice-activity waveform bars driven by `gemini-3.8-flash-tts` audio playback.
+  - **Live Closed Captions & Dialect Tags**: Floating dialect badges and live subtitle bubbles (`#caption_<id>`) directly on the active speaker's Discord tile.
+  - **Simultaneous Floor-Bid & Vote Badges**: Real-time badges (`👑 Leader`, `🛡️ On Quest`, `✋ Wants Mic`, `🤫 Strategic Silence`, `🤝 Yielded Mic`, `Approved`/`Rejected`) across all 8 tiles.
 
 ---
 
