@@ -14,10 +14,10 @@
       --card: #161b2e;
       --border: rgba(255, 255, 255, 0.1);
       --pink: #ec4899;
-      --indigo: #6366f1;
+      --indigo: #5865f2;
       --cyan: #06b6d4;
       --gold: #f59e0b;
-      --green: #10b981;
+      --green: #23a55a;
       --red: #f43f5e;
       --text: #f8fafc;
       --muted: #94a3b8;
@@ -41,6 +41,8 @@
       top: 0;
       z-index: 20;
       backdrop-filter: blur(12px);
+      gap: 12px;
+      flex-wrap: wrap;
     }
     .brand h1 {
       font-family: 'Outfit', sans-serif;
@@ -49,6 +51,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-wrap: wrap;
     }
     .badge {
       font-family: 'JetBrains Mono', monospace;
@@ -58,13 +61,14 @@
       border-radius: 6px;
     }
     .back-btn {
-      background: linear-gradient(135deg, var(--pink), var(--indigo));
+      background: linear-gradient(135deg, var(--indigo), var(--pink));
       color: #fff;
       text-decoration: none;
       font-weight: 700;
       font-size: 13px;
       padding: 9px 16px;
       border-radius: 8px;
+      white-space: nowrap;
     }
     .container {
       max-width: 1220px;
@@ -130,7 +134,7 @@
     }
     .pipeline-flow {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
       gap: 10px;
       margin-top: 12px;
     }
@@ -170,6 +174,7 @@
       font-size: 12.5px;
       color: #e2e8f0;
       white-space: pre-wrap;
+      overflow-x: auto;
     }
     .epistemic-selector {
       display: flex;
@@ -194,29 +199,38 @@
     }
     .video-preview-strip {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
       gap: 10px;
-      margin-top: 12px;
+      margin-top: 14px;
     }
     .mini-cam {
-      background: #000;
+      background: #0d1220;
       border-radius: 10px;
       overflow: hidden;
-      border: 1px solid var(--border);
+      border: 2px solid rgba(35, 165, 90, 0.55);
       position: relative;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     }
-    .mini-cam video {
+    .mini-cam img {
       width: 100%;
       height: 110px;
       object-fit: cover;
       display: block;
     }
-    .mini-cam span {
+    .mini-cam .cam-label {
       display: block;
-      padding: 5px 7px;
-      font-size: 11px;
+      padding: 6px 8px 2px 8px;
+      font-size: 12px;
       font-weight: 700;
-      background: #0d1220;
+      text-align: center;
+      color: #f8fafc;
+    }
+    .mini-cam .cam-sub {
+      display: block;
+      padding: 0 8px 6px 8px;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #94a3b8;
       text-align: center;
     }
   </style>
@@ -224,27 +238,55 @@
 <body>
   <header>
     <div class="brand">
-      <h1>IDOL AVALON LIVE <span class="badge">ARCHITECTURE &amp; VERIFICATION WALKTHROUGH</span></h1>
+      <h1>IDOL AVALON LIVE <span class="badge">DISCORD PARTY PLAY ARCHITECTURE &amp; VERIFICATION WALKTHROUGH</span></h1>
     </div>
-    <a href="/" class="back-btn">🎥 Return to Live Zoom Studio</a>
+    <a href="/" class="back-btn">🔊 Return to #avalon-stage-7p</a>
   </header>
 
   <main class="container">
-    <!-- Section 1: Live Webcam Assets Preview -->
+    <!-- Section 1: 4K Discord Stage Cast Preview -->
     <section class="section-card">
-      <span class="section-eyebrow">1. REAL-TIME MULTIMODAL STUDIO FEEDS</span>
-      <h2>7 Native `.mp4` Studio Webcam Streams (`gemini-omni-1.1-flash`) + 4K Portraits (`gemini-nano-banana-2.1`)</h2>
+      <span class="section-eyebrow">1. DISCORD VOICE &amp; VIDEO PARTY STAGE (#avalon-stage-7p)</span>
+      <h2>4K Visual Center Studio Portraits (`gemini-nano-banana-2.1`) + Zero-Cutoff Voice (`gemini-3.8-flash-tts`)</h2>
       <p style="color:var(--muted); font-size:13.5px;">
-        Every character in the broadcast studio runs an authentic `.mp4` webcam video loop generated via <code>gemini-omni-1.1-flash</code> (`background: true`) layered underneath a 60FPS transparent HTML5 Canvas HUD that tracks phoneme visemes, autofocus brackets, and simultaneous listener reactions.
+        To solve the 7–10 player headcount barrier of Mafia &amp; Avalon, 1 Human Guest joins <strong>MC Jae-ho (`유재호`)</strong> and <strong>6 autonomous AI K-Pop Idols</strong> in a live Discord voice &amp; video room. Each participant tile renders a pre-generated 16:9 4K studio portrait (`portrait_*.png`), a 60FPS audio-reactive Discord speaking ring (`#23a55a`), and Namuwiki-inspired character lore while keeping 100% of spoken dialogue focused on Avalon Quest rosters, vote math, and suspect deduction.
       </p>
       <div class="video-preview-strip">
-        <div class="mini-cam"><video src="/generated/webcam_mc_jaesuk.mp4" poster="/generated/portrait_mc_jaesuk.png" autoplay loop muted playsinline></video><span>MC Jae-suk</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_wonyoung.mp4" poster="/generated/portrait_idol_wonyoung.png" autoplay loop muted playsinline></video><span>Wonyoung</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_karina.mp4" poster="/generated/portrait_idol_karina.png" autoplay loop muted playsinline></video><span>Karina</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_sullyoon.mp4" poster="/generated/portrait_idol_sullyoon.png" autoplay loop muted playsinline></video><span>Sullyoon</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_yuna.mp4" poster="/generated/portrait_idol_yuna.png" autoplay loop muted playsinline></video><span>Yuna</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_chaewon.mp4" poster="/generated/portrait_idol_chaewon.png" autoplay loop muted playsinline></video><span>Chaewon</span></div>
-        <div class="mini-cam"><video src="/generated/webcam_idol_hanni.mp4" poster="/generated/portrait_idol_hanni.png" autoplay loop muted playsinline></video><span>Hanni</span></div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_mc_jaesuk.png" alt="MC Jae-ho" />
+          <span class="cam-label">MC Jae-ho (유재호)</span>
+          <span class="cam-sub">🎙️ Party Moderator (ISFP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_wonyoung.png" alt="Seoyoung" />
+          <span class="cam-label">Seoyoung (서영)</span>
+          <span class="cam-sub">✨ Lucky Seoyoung (ISTP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_karina.png" alt="Rina" />
+          <span class="cam-label">Rina (리나)</span>
+          <span class="cam-sub">🧊 Prosecutor Math (ENFP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_sullyoon.png" alt="Seol-ah" />
+          <span class="cam-label">Seol-ah (설아)</span>
+          <span class="cam-sub">🌊 Busan Satoori (ISFP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_yuna.png" alt="Yura" />
+          <span class="cam-label">Yura (유라)</span>
+          <span class="cam-sub">🍑 Chungcheong Sarcasm (ENFP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_chaewon.png" alt="Chaerin" />
+          <span class="cam-label">Chaerin (채린)</span>
+          <span class="cam-sub">🔥 Fierce Street-Boss (ISTP)</span>
+        </div>
+        <div class="mini-cam">
+          <img src="/generated/portrait_idol_hanni.png" alt="Hana" />
+          <span class="cam-label">Hana (하나)</span>
+          <span class="cam-sub">🦘 Melbourne Aussie (INFP)</span>
+        </div>
       </div>
     </section>
 
@@ -275,8 +317,8 @@
         </div>
         <div class="flow-step" data-step="4">
           <span class="step-num">STAGE 05</span>
-          <h4>Multimodal Synthesis</h4>
-          <p><code>gemini-3.8-flash-tts</code> WAV voice + <code>lyria-3.5</code> adaptive BGM.</p>
+          <h4>Zero-Cutoff Audio DSP</h4>
+          <p>Lookahead <code>gemini-3.8-flash-tts</code> queue + 3.0s circular crossfade <code>lyria-3.5</code> BGM.</p>
         </div>
       </div>
       <div class="inspector-box" id="pipelineInspector"></div>
@@ -304,33 +346,33 @@
       <div class="model-grid">
         <div class="model-box">
           <span class="model-id">gemini-4-argon</span>
-          <h3>Showrunner, Deduction &amp; Verifier</h3>
-          <p>Drives AI Leader proposals (<code>thinking_level: "high"</code>), idol deception (<code>"medium"</code>), MC Jae-suk hosting (<code>"low"</code>), and the self-healing verification loop. Zero legacy sampling params.</p>
+          <h3>Game Master, Deduction &amp; Verifier</h3>
+          <p>Drives AI Leader proposals (<code>thinking_level: "high"</code>), idol deception (<code>"medium"</code>), MC Jae-ho hosting (<code>"low"</code>), Assassin Merlin deduction (<code>"high"</code>), and the self-healing verification loop. Zero legacy sampling params.</p>
         </div>
         <div class="model-box">
           <span class="model-id">gemini-3.8-flash</span>
-          <h3>Parallel 6-Idol Vote Engine</h3>
-          <p>Executes simultaneous <code>APPROVE</code> / <code>REJECT</code> team votes across all 6 AI Idols in parallel with sub-second turnarounds.</p>
-        </div>
-        <div class="model-box">
-          <span class="model-id">gemini-omni-1.1-flash</span>
-          <h3>Live Studio Webcam Video (`.mp4`)</h3>
-          <p>Generates 16:9 studio webcam video feeds via asynchronous background interactions (<code>background: true</code>) polled via <code>ai.interactions.get(id)</code>.</p>
+          <h3>Parallel 6-Idol Floor &amp; Vote Engine</h3>
+          <p>Evaluates parallel 6-agent floor urgency (<code>SPEAK</code> vs. <code>HOLD_SILENT</code>) and executes simultaneous <code>APPROVE</code> / <code>REJECT</code> team votes across all 6 AI Idols via <code>Promise.all</code>.</p>
         </div>
         <div class="model-box">
           <span class="model-id">gemini-nano-banana-2.1</span>
           <h3>4K Studio Portrait Anchors</h3>
-          <p>Produces high-resolution photorealistic studio portraits for MC Jae-suk and all 6 K-Pop Idols.</p>
+          <p>Produces high-resolution photorealistic 16:9 Korean studio portraits (<code>portrait_*.png</code>) for MC Jae-ho and all 6 K-Pop Visual Center Idols.</p>
         </div>
         <div class="model-box">
           <span class="model-id">gemini-3.8-flash-tts</span>
-          <h3>Expressive English Voice Synthesis</h3>
-          <p>Synthesizes real-time <code>audio/wav</code> character speech that drives the 60FPS phoneme/viseme HUD and audio waveform bars.</p>
+          <h3>Zero-Cutoff Expressive Voice + Lookahead Queue</h3>
+          <p>Synthesizes sanitized <code>24kHz</code> RIFF WAV character speech decoded via Web Audio API with background lookahead pre-fetching for ~700ms turn handoffs.</p>
         </div>
         <div class="model-box">
           <span class="model-id">lyria-3.5 / lyria-3-clip-preview</span>
-          <h3>Phase-Adaptive Broadcast BGM</h3>
-          <p>Dynamically generates and switches instrumental tension loops across Discussion, Vote, Quest Execution, and Assassin Climax phases.</p>
+          <h3>Seamless Circular Crossfade BGM</h3>
+          <p>Generates steady ambient tracks post-processed on the client via <code>createSeamlessLoopBuffer()</code> (3.0s equal-power circular crossfade + RMS dropout elimination + <code>-48 dB</code> <code>GainNode</code>).</p>
+        </div>
+        <div class="model-box">
+          <span class="model-id">gemini-3.5-transcribe &amp; omni-1.1-flash</span>
+          <h3>Live Voice STT &amp; Async Video</h3>
+          <p><code>gemini-3.5-transcribe</code> transcribes Korean/English mic speech into game actions; <code>gemini-omni-1.1-flash</code> was benchmarked via <code>background: true</code> for async 16:9 studio clips.</p>
         </div>
       </div>
     </section>
@@ -341,7 +383,7 @@
 `// STAGE 01: Strict Epistemic Isolation (src/avalonEngine.js)
 const privateView = buildPrivatePlayerView(game, speaker.id);
 // Returns ONLY:
-// - privateView.self: { id, name, roleId, roleName, alignment }
+// - privateView.self: { id, name, stageName, roleId, roleName, alignment }
 // - privateView.epistemicVision: { knownEvilIds, merlinCandidateIds, nightVisionText }
 // - privateView.suspicionLedger: Bayesian suspicion scores (0..100) derived from public votes & quest fails`,
 `// STAGE 02: Gemini 4 Argon Dual-Channel Reasoning (src/geminiOrchestrator.js)
@@ -357,23 +399,23 @@ const response = await ai.interactions.create({
 // 1. Deterministic audit checks for:
 //    - Merlin self-reveal leak ("I am Merlin" / "my night vision")
 //    - Good player claiming Evil alignment
-//    - Hallucinated Quest numbers or team sizes
+//    - Hallucinated Quest numbers or illegal team sizes
 // 2. If flagged, gemini-4-argon (thinking_level="medium") rewrites the utterance in-character before emission!`,
 `// STAGE 04: Parallel 6-Idol Vote Resolution (gemini-3.8-flash)
 const votePromises = aiPlayers.map((idol) =>
   generateIdolVoteDecision(game, idol.id) // Runs concurrently via Promise.all
 );
 const decisions = await Promise.all(votePromises);`,
-`// STAGE 05: Multimodal Broadcast Output
-// - Voice: gemini-3.8-flash-tts returns base64 RIFF audio/wav
-// - Video: gemini-omni-1.1-flash .mp4 stream reacts with scale/playbackRate modulation
-// - Music: lyria-3-clip-preview adapts studio BGM to current game phase`
+`// STAGE 05: Zero-Cutoff Web Audio API + Seamless Circular Crossfade BGM (public/app.js)
+// - Voice: cleanTextForTts() -> gemini-3.8-flash-tts -> 24kHz RIFF WAV -> AudioContext.decodeAudioData()
+// - Lookahead Pre-Fetch: Pre-generates the next speaker's turn while current speaker's audio plays (~700ms handoff)
+// - Music: lyria-3-clip-preview -> createSeamlessLoopBuffer() (3.0s cos/sin equal-power circular crossfade at -48 dB)`
     ];
 
     const ROLE_SNIPPETS = {
       MERLIN: `Role: MERLIN (Loyal Servant of Arthur — GOOD)
 Epistemic Vision:
-- Sees all 3 Evil players (ASSASSIN, MORGANA, OBERON) with 👁️ EVIL badges.
+- Sees all 3 Evil players (ASSASSIN, MORGANA, OBERON) with 👁️ EVIL badges on the Discord stage grid.
 - Strategic Constraint: Must subtly steer Good players away from Evil teams WITHOUT exposing Merlin's identity to the Assassin!
 - Verification Rule: verifyAndHealUtterance() blocks any explicit "I am Merlin" leak.`,
       PERCIVAL: `Role: PERCIVAL (Loyal Servant of Arthur — GOOD)

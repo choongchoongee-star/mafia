@@ -4,3 +4,4 @@ node_modules/
 public/generated/*.wav
 *.log
 .DS_Store
+.gcloud/
