@@ -34,6 +34,9 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:04 KST] Task 10: Core Purpose, Engineering Retrospective & Future Roadmap Documentation**
+  - **Action**: Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md) and [README.md](file:///c:/Users/Charlie/Business/Projects/mafia/README.md) with the Core Problem Statement (solving the 7–10 player headcount barrier of Mafia/Avalon), the Real-Time Video Generation Latency vs. Debate Pacing Retrospective, and the 3-pillar Future Product Roadmap (Hybrid Multi-Human + AI Fill Matchmaking, Customizable NPC Universes, and Real-Time Streaming Video Micro-Expressions).
+  - **Result**: Ready for direct copy-paste into the Hackathon Submission Form and pushed to GitHub.
 - **[2026-10-16 13:03 KST] Task 9: Live `.env` Verification, Lyria 3.5 Adaptive BGM API & Microphone Voice Input (`gemini-3.5-transcribe`)**
   - **Action**:
     1. Verified live `GEMINI_API_KEY` in [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (`apiKeyConfigured: true` on `/api/status`).
@@ -50,9 +53,6 @@
 - **[2026-10-16 12:30 KST] Task 6: Live Verification of All 4 Google Doc Tabs**
   - **Action**: Re-fetched all 4 live tabs (`t.buqd8v5hdzxz`, `t.yemjng8rofdc`, `t.reg13nqd61w`, `t.wdm4t18j5jqx`) directly from the official Google Doc (`13hG3aETJ54oKULF3JZUgM5VYHv7o2ZM4a4AZeqinbRg`) to check for real-time updates (such as the submission link status and `@gcplab.me` account rules) and added the full Tab 2 (`@gcplab.me` & GCP guide) section to [docs/hackathon-guide.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/hackathon-guide.md).
   - **Result**: All 4 sections verified and documented; older log entry archived to [logs/log-2026-10.md](file:///c:/Users/Charlie/Business/Projects/mafia/logs/log-2026-10.md).
-- **[2026-10-16 12:19 KST] Task 5: `.env` File Creation & Hot-Reload Support**
-  - **Action**: Created local [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (excluded from git via [.gitignore](file:///c:/Users/Charlie/Business/Projects/mafia/.gitignore)) and updated [`hasGeminiApiKey`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L53-L68) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) to automatically hot-reload `GEMINI_API_KEY` from `.env` on disk without requiring a server restart.
-  - **Result**: Ready for user to paste `GEMINI_API_KEY` into [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env).
 
 
 
