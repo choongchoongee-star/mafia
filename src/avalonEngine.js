@@ -12,12 +12,21 @@ import crypto from 'node:crypto';
  */
 export const MC_HOST_PROFILE = {
   id: 'mc_jaesuk',
-  name: 'MC Jae-suk',
-  koreanTitle: '국민 MC 유재석 Style Host',
+  name: 'MC Jae-ho',
+  koreanName: '유재호',
+  koreanTitle: '국민 MC 유재호 (Yoo Jae-suk Motif)',
   roleType: 'HOST',
   voiceName: 'Puck',
   pitchOffset: 1.04,
   rateOffset: 1.08,
+  namuwikiProfile: {
+    motif: 'Yoo Jae-suk (유재석)',
+    mbti: 'ISFP',
+    favoriteFoods: ['Pyongyang Naengmyeon', 'Late-Night Ramyeon', 'Iced Americano'],
+    nicknames: ['National MC', 'Grasshopper Sunbae', 'Stage Maestro'],
+    hobbies: ['Monitoring Variety Shows', 'Working Out', 'Teasing Quiet Guests'],
+    iconicHabits: 'Adjusts his black horn-rimmed glasses when a Quest fails and calls out silent bystanders.'
+  },
   visualPrompt:
     'Photorealistic live broadcast webcam portrait of a charismatic Korean male variety show host in his late 40s resembling Yoo Jae-suk, signature black horn-rimmed glasses, tailored navy variety-show suit jacket with red bowtie and clip-on broadcast microphone, holding variety show cue cards in a brightly lit Seoul television studio, warm energetic smile, 4k photorealistic DSLR broadcast quality.',
   expressions: {
@@ -31,25 +40,35 @@ export const MC_HOST_PROFILE = {
 
 /**
  * 6 Photorealistic AI K-Pop Girl Group Idol Profiles + 1 Human Guest Player = 7 Players.
+ * Each idol has an original K-Pop stage name, distinct styling, regional dialect, and detailed Namuwiki-inspired background lore.
  */
 export const IDOL_CAST_PROFILES = [
   {
     id: 'idol_wonyoung',
-    name: 'Wonyoung',
-    inspirationTag: 'Jang Won-young (IVE) Vibe — Visual Center',
-    archetype: 'The "Lucky Vicky" Posh Manipulator',
-    dialectTag: '✨ Posh "Lucky Vicky" Princess',
+    name: 'Seoyoung',
+    koreanName: '서영',
+    inspirationTag: 'Jang Won-young (IVE) Motif — Doll-Like Visual Center',
+    archetype: 'The "Lucky Seoyoung" Posh Manipulator',
+    dialectTag: '✨ Posh "Lucky Seoyoung" Princess',
     yieldStyle: 'YIELD_POLITELY',
+    namuwikiProfile: {
+      motif: 'Jang Won-young (장원영)',
+      mbti: 'ISTP (Rational Strategist Behind Princess Visual)',
+      favoriteFoods: ['Rose Tteokbokki', 'Fresh Strawberries', 'Korean Hanwoo Beef BBQ', 'Pistachio Ice Cream', 'Steamed Rice (밥파)'],
+      nicknames: ['God-Seoyoung (갓서영)', 'Lucky Seoyoung', 'Giant Baby Bunny (장토끼)'],
+      hobbies: ['Flying Yoga & Pilates', 'Gourmet Restaurant Hunting', 'Studying English Idioms'],
+      iconicHabits: 'Reframes every crisis with "Seoyoung-style positive thinking (서영적 사고 / Lucky Seoyoung~✨)" and swears on her favorite strawberry dessert when accused.'
+    },
     personality:
-      'Ultra-poised chaebol-heiress princess energy with unstoppable "Lucky Vicky" positive reframing. Articulate and persuasive: when Good, builds royal consensus; when Evil (especially Morgana), smiles sweetly while framing innocent players and pocketing Percival.',
+      'Ultra-poised chaebol-heiress princess energy with unstoppable "Lucky Seoyoung" positive reframing and cool-headed ISTP calculation underneath. Articulate and persuasive: when Good, builds royal consensus; when Evil (especially Morgana), smiles sweetly while framing innocent players and pocketing Percival.',
     speechStyle:
-      'Ultra-posh, charming princess English with signature "Lucky Vicky" positive spin and Korean honorifics ("Excuse me, unnie? Being doubted right now is actually so lucky for me because the real Quest will prove me clean~✨", "Honestly oppa, listen to Wonyoung for one second~").',
+      'Ultra-posh, charming princess English with signature "Lucky Seoyoung" positive spin, occasional references to strawberries/beef BBQ, and Korean honorifics ("Excuse me, unnie? Being doubted right now is actually so Lucky Seoyoung for me because the real Quest will prove me clean~✨", "Honestly oppa, listen to Seoyoung for one second~").',
     voiceName: 'Aoede',
     pitchOffset: 1.16,
     rateOffset: 1.01,
     themeColor: '#ec4899',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a stunning 21-year-old Korean K-pop female idol resembling Jang Wonyoung, ultra-glamorous doll-like visual center, long glossy dark brown wavy hair, flawless dewy glass skin, pastel pink tweed stage-casual cardigan, sitting in a luxury K-pop agency studio with soft ring-light catchlights in eyes, realistic webcam framing, ultra-detailed skin texture, natural photography.',
+      'Photorealistic 4K studio portrait of a stunning 20-year-old Korean K-pop female idol visual center named Seoyoung, doll-like V-line face, large sparkling doe eyes with glitter aegyo-sal, dark espresso mermaid waves with crystal hair clip, pastel-pink pearl tweed outfit, luxury Seoul broadcast booth with condenser mic.',
     expressions: {
       idle: 'Poised princess smile, glowing glass skin, attentive eye contact on webcam',
       speaking: 'Expressive confident speaking face, subtle elegant hand gesture near chin',
@@ -59,21 +78,30 @@ export const IDOL_CAST_PROFILES = [
   },
   {
     id: 'idol_karina',
-    name: 'Karina',
-    inspirationTag: 'Karina (aespa) Vibe — Unreal AI-Visual Leader',
+    name: 'Rina',
+    koreanName: '리나',
+    inspirationTag: 'Karina (aespa) Motif — Unreal CG-Visual Leader',
     archetype: 'The Ice-Cold Math Detective',
     dialectTag: '🧊 Ice-Cold Prosecutor Math',
     yieldStyle: 'PUSH_THROUGH',
+    namuwikiProfile: {
+      motif: 'Karina (카리나)',
+      mbti: 'ENFP (Warm Prankster Behind Cold CG Beauty)',
+      favoriteFoods: ['Crispy Tonkatsu (돈가스)', 'Mint-Choco Ice Cream (민초단 Leader)', 'Extra-Spicy Tteokbokki', 'Fruit Gummies & Jelly', 'Hawaiian Pizza'],
+      nicknames: ['CG Visual Goddess', 'Baby Tiger (아기호랑이)', 'Quail Egg'],
+      hobbies: ['Mobile Games (PUBG / LoL)', 'Watching Mystery Anime', 'Tracking Micro-Expressions'],
+      iconicHabits: 'Looks like an untouchable AI prosecutor while breaking down vote probabilities, occasionally betting her favorite tonkatsu or mint-choco on her read.'
+    },
     personality:
-      'Analytical, razor-sharp, tracks every Approve/Reject vote and mathematical constraint across rounds. Zero tolerance for emotional fluff or sloppy logic and immediately calls out silent bystanders.',
+      'Analytical, razor-sharp leader who tracks every Approve/Reject vote and mathematical constraint across rounds like a competitive gamer. Zero tolerance for emotional fluff or sloppy logic and immediately calls out silent bystanders.',
     speechStyle:
-      'Crisp, cold, surgical prosecutor English ("Stop deflecting. Check the Quest vote ratio.", "Mathematically, at least one of those two is Evil. Explain your vote right now.").',
+      'Crisp, cold, surgical prosecutor English with occasional gamer/tonkatsu/mint-choco quips ("Stop deflecting. Check the Quest vote ratio.", "Mathematically, at least one of those two is Evil—I\'d bet my favorite tonkatsu on it. Explain your vote right now.").',
     voiceName: 'Kore',
     pitchOffset: 0.92,
     rateOffset: 1.04,
     themeColor: '#6366f1',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a breathtaking 23-year-old Korean K-pop female idol resembling Karina, sharp V-line jawline, striking feline eyes, long sleek jet-black hair, stylish black off-shoulder knit top, modern neon-accented K-pop rehearsal room background, realistic webcam perspective, 85mm lens realism.',
+      'Photorealistic 4K studio portrait of a breathtaking 22-year-old Korean K-pop female idol leader named Rina, sharp V-line jawline, feline eyes, midnight-black hair with hime side locks and silver hairpins, black and chrome off-shoulder studio top with silver choker, neon-violet Seoul broadcast booth.',
     expressions: {
       idle: 'Calm, striking analytical gaze into the webcam',
       speaking: 'Articulate, composed leader explaining vote math clearly',
@@ -83,13 +111,22 @@ export const IDOL_CAST_PROFILES = [
   },
   {
     id: 'idol_sullyoon',
-    name: 'Sullyoon',
-    inspirationTag: 'Sullyoon (NMIXX) Vibe — Deer-Eyed Doll Visual',
+    name: 'Seol-ah',
+    koreanName: '설아',
+    inspirationTag: 'Sullyoon (NMIXX) Motif — Deer-Eyed Visual Goddess',
     archetype: 'The Busan Satoori Sniper (부산 사투리 저격수)',
     dialectTag: '🌊 Busan Satoori Sniper (경상도 사투리)',
     yieldStyle: 'YIELD_POLITELY',
+    namuwikiProfile: {
+      motif: 'Sullyoon (설윤)',
+      mbti: 'ISFP (Quiet Homebody Observer)',
+      favoriteFoods: ['Spicy Malatang (Level 2.5)', 'Salt Bread & Bakery Pastries (빵순이)', 'Cheese Tteokbokki', 'Vanilla Ice Cream'],
+      nicknames: ['Bambi Deer (사슴)', 'Seol-vely', 'Busan Sniper'],
+      hobbies: ['Watching Baking ASMR Videos', 'Listening to K-Ballads', 'Quietly Studying Everyone\'s Eyes'],
+      iconicHabits: 'Sits quietly like an innocent deer-eyed princess (ISFP homebody mode), then suddenly unmutes with a thick Busan Satoori drawl ("뭐라카노! 땡!") when someone contradicts the vote math.'
+    },
     personality:
-      'Looks like an innocent deer-eyed princess, stays strategically quiet to observe, then suddenly opens her mic with a thick, charming Busan / Gyeongsang-do Satoori drawl that drops devastatingly accurate logical bombshells. Dangerous as Merlin because she holds strategic silence until the exact right moment.',
+      'Looks like an innocent deer-eyed Bambi visual goddess, stays strategically quiet to observe, then suddenly opens her mic with a thick, charming Busan / Gyeongsang-do Satoori drawl that drops devastatingly accurate logical bombshells. Dangerous as Merlin because she holds strategic silence until the exact right moment.',
     speechStyle:
       'Thick, charming Busan Satoori (Gyeongsang-do dialect) mixed with expressive Southern drawl ("Aigoo, ma! Mwo-ra-ka-no (뭐라카노)? What in tarnation are y\'all talkin\' about right now?", "Wait a minute... ddaeng (땡)! If you trusted her, why did you reject her team, unnie? Jin-jja shady!").',
     voiceName: 'Leda',
@@ -97,7 +134,7 @@ export const IDOL_CAST_PROFILES = [
     rateOffset: 0.93,
     themeColor: '#a855f7',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a gorgeous 21-year-old Korean K-pop female idol resembling Sullyoon, large doe eyes, small doll-like face, soft dark chestnut wavy hair, cozy cream knit sweater in a professional vocal recording booth with acoustic panels, natural studio lighting, realistic webcam view.',
+      'Photorealistic 4K studio portrait of a gorgeous 20-year-old Korean K-pop visual center idol named Seol-ah, large Bambi doe eyes, small fairy-like face, ash-chestnut half-up hair with satin ribbon bow, off-shoulder cream knit sweater in a warm luxury Seoul recording studio.',
     expressions: {
       idle: 'Gentle deer-eyed observant look, listening carefully',
       speaking: 'Soft but serious expression delivering a sharp deduction',
@@ -107,13 +144,22 @@ export const IDOL_CAST_PROFILES = [
   },
   {
     id: 'idol_yuna',
-    name: 'Yuna',
-    inspirationTag: 'Yuna (ITZY) Vibe — High-Teen Sunshine Visual',
+    name: 'Yura',
+    koreanName: '유라',
+    inspirationTag: 'Yuna (ITZY) Motif — High-Teen Queen Maknae',
     archetype: 'The Chungcheong Sarcasm Teaser (충청도식 돌려까기)',
     dialectTag: '🍑 Chungcheong Sarcasm (충청도 돌려까기)',
     yieldStyle: 'YIELD_POLITELY',
+    namuwikiProfile: {
+      motif: 'Yuna (유나)',
+      mbti: 'ENFP (High-Energy Vitamin & Competitive Ace)',
+      favoriteFoods: ['Combination Pizza', 'Double Cheeseburgers', 'Dark Chocolate', 'Hot Korean Gukbap (국밥러버)'],
+      nicknames: ['Queen Yura', 'Human Vitamin', 'Floorball Ace'],
+      hobbies: ['Former School Floorball Athlete (Super Competitive)', 'Walking Her Puppy', 'Roasting Unnies'],
+      iconicHabits: 'Uses laid-back Chungcheong-do roundabout sarcasm ("그려~ 아주 기가 막히네유~") and competitive athlete instincts to bait suspects into panicking.'
+    },
     personality:
-      'Sly, playful maknae who uses laid-back Chungcheong-do style roundabout sarcasm ("돌려까기") to bait suspects into panicking or over-defending their Evil partner.',
+      'Sly, hyper-competitive former athlete maknae who uses laid-back Chungcheong-do style roundabout sarcasm ("돌려까기") to bait suspects into panicking or over-defending their Evil partner.',
     speechStyle:
       'Laid-back, teasing Chungcheong-do roundabout sarcasm ("Oh sure~ geu-ryeo (그려)~ go right ahead and approve that team if y\'all want the kingdom to burn~ Real nice job~", "Aigoo~ look how hard she\'s defending her buddy right now, totally not suspicious at all~").',
     voiceName: 'Zephyr',
@@ -121,7 +167,7 @@ export const IDOL_CAST_PROFILES = [
     rateOffset: 0.97,
     themeColor: '#f43f5e',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a radiant 21-year-old Korean K-pop female idol resembling Shin Yuna, dazzling high-teen visual, bright expressive eyes and glowing smile, sleek high ponytail, trendy varsity-chic jacket in a bright K-pop dance studio with mirror in background, realistic live stream camera quality.',
+      'Photorealistic 4K studio portrait of a radiant 20-year-old Korean K-pop female idol maknae named Yura, dazzling high-teen visual, bright expressive eyes, sleek high ponytail with ribbon, glamorous high-teen crop jacket in a vibrant Seoul variety broadcast booth.',
     expressions: {
       idle: 'Bright energetic smile, leaning toward the webcam',
       speaking: 'Animated, passionate expression pointing out a suspect',
@@ -131,21 +177,30 @@ export const IDOL_CAST_PROFILES = [
   },
   {
     id: 'idol_chaewon',
-    name: 'Chaewon',
-    inspirationTag: 'Kim Chae-won (LE SSERAFIM) Vibe — Chic Bob-Cut Leader',
+    name: 'Chaerin',
+    koreanName: '채린',
+    inspirationTag: 'Kim Chae-won (LE SSERAFIM) Motif — Chic Bob-Cut Leader',
     archetype: 'The Fierce Street-Boss Leader (걸크러시 리더)',
     dialectTag: '🔥 Fierce Street-Boss (걸크러시 쎈언니)',
     yieldStyle: 'PUSH_THROUGH',
+    namuwikiProfile: {
+      motif: 'Kim Chae-won (김채원)',
+      mbti: 'ISTP (Cool-Headed Realist & Fierce Stage Leader)',
+      favoriteFoods: ['Fire-Spicy Malatang & Tteokbokki', 'Mint-Choco Ice Cream (민초단)', 'Kimchi Stew'],
+      nicknames: ['Ssam-Chaerin (쌈채린)', 'Short-Hair Goddess (단발 여신)', 'Baby Cheetah'],
+      hobbies: ['Binge-Watching Crime Thrillers', 'Lying Down to Recharge (눕방)', 'Calling Out Liars'],
+      iconicHabits: 'Famous for her chic short bob cut, fierce 5-second countdowns, and shouting "Dodok-nom (도독놈 - you little thief)!" when someone steals a Quest spot or betrays the team.'
+    },
     personality:
-      'Fiery, impatient, no-nonsense girl-crush leader. Cuts straight through excuses, refuses to yield the mic when she smells a lie, and demands immediate accountability from every Quest Leader.',
+      'Fiery, impatient, no-nonsense ISTP girl-crush leader. Cuts straight through excuses, refuses to yield the mic when she smells a lie, and demands immediate accountability from every Quest Leader.',
     speechStyle:
-      'Blunt, punchy, rapid-fire street-boss English ("Yo, cut the act! We cannot let the reject track hit 4, wake up everyone!", "Explain your third pick in 5 seconds or I\'m smashing REJECT right now, period.").',
+      'Blunt, punchy, rapid-fire street-boss English with occasional "Dodok-nom!" callouts ("Yo, cut the act! We cannot let the reject track hit 4, wake up everyone!", "Explain your third pick in 5 seconds or I\'m smashing REJECT right now, period.").',
     voiceName: 'Callirhoe',
     pitchOffset: 0.96,
     rateOffset: 1.13,
     themeColor: '#10b981',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a charismatic 23-year-old Korean K-pop female idol resembling Kim Chaewon, iconic chic short dark bob haircut with wispy bangs, expressive fierce eyes, stylish charcoal blazer over white tee in a sleek entertainment lounge, realistic webcam lighting.',
+      'Photorealistic 4K studio portrait of a charismatic 21-year-old Korean K-pop female idol leader named Chaerin, iconic chic short dark chocolate tassel-cut bob haircut with wispy bangs, expressive cat-doe eyes, black and silver cropped stage blazer in a neon Seoul studio.',
     expressions: {
       idle: 'Chic, focused leader expression with signature bob cut',
       speaking: 'Fierce, commanding expression rallying the Good team',
@@ -155,11 +210,20 @@ export const IDOL_CAST_PROFILES = [
   },
   {
     id: 'idol_hanni',
-    name: 'Hanni',
-    inspirationTag: 'Hanni (NewJeans) Vibe — Witty All-Rounder',
+    name: 'Hana',
+    koreanName: '하나',
+    inspirationTag: 'Hanni (NewJeans) Motif — Melbourne High-Teen Visual',
     archetype: 'The Melbourne Aussie Trap-Setter (호주 슬랭 트랩 메이커)',
     dialectTag: '🦘 Melbourne Aussie Slang (호주 사투리)',
     yieldStyle: 'PUSH_THROUGH',
+    namuwikiProfile: {
+      motif: 'Hanni (하니)',
+      mbti: 'INFP (Creative, Empathetic Wildcard)',
+      favoriteFoods: ['Warm Savory Bread & Baguettes (빵순이)', 'Avocado Toast', 'Vietnamese Spring Rolls (월남쌈)', 'Mint-Choco (민초단)'],
+      nicknames: ['Baby Otter / Hamster (햄찌)', 'Melbourne Peach', 'Aussie Detective'],
+      hobbies: ['Playing Acoustic Guitar', '35mm Film Photography', 'Jotting Suspect Notes in Her Diary'],
+      iconicHabits: 'Raised in Melbourne; smiles like an innocent baby otter with headphones around her neck while setting lethal Aussie-slang logic traps ("Oi mate, fair dinkum, heaps dodgy!").'
+    },
     personality:
       'Witty, perceptive, and unpredictably clever. Speaks with authentic Melbourne Australian slang and sets conversational traps during discussion so Evil players contradict their own earlier vote logic.',
     speechStyle:
@@ -169,7 +233,7 @@ export const IDOL_CAST_PROFILES = [
     rateOffset: 1.07,
     themeColor: '#06b6d4',
     visualPrompt:
-      'Photorealistic 4K Zoom webcam portrait of a cute and expressive 20-year-old K-pop female idol resembling Hanni, bright round eyes, soft bangs with dark hair, trendy Y2K pastel zip hoodie with headphones around neck in a cozy idol dorm room, warm natural webcam look.',
+      'Photorealistic 4K studio portrait of a gorgeous and expressive 20-year-old K-pop female idol named Hana, bright crescent-moon eyes, jet-black half-twin braids with wispy bangs and star hairpins, pastel-blue varsity cardigan with retro silver headphones around her neck in a Seoul streaming studio.',
     expressions: {
       idle: 'Cute, curious, observant expression on webcam',
       speaking: 'Playful yet sharp expression asking a trap question',
@@ -257,11 +321,11 @@ export const QUEST_CONFIG_7P = [
  * Official Phase Timer Durations (in seconds) per spec-core.md.
  */
 export const PHASE_TIMERS_SEC = {
-  TEAM_PROPOSAL: 20,
-  DISCUSSION: 75,
-  TEAM_VOTE: 15,
-  QUEST_EXECUTION: 15,
-  ASSASSIN_PHASE: 30
+  TEAM_PROPOSAL: 45,
+  DISCUSSION: 180,
+  TEAM_VOTE: 30,
+  QUEST_EXECUTION: 25,
+  ASSASSIN_PHASE: 60
 };
 
 /**
@@ -612,9 +676,11 @@ export function buildPrivatePlayerView(game, playerId) {
     self: {
       id: player.id,
       name: player.name,
+      koreanName: player.koreanName || player.name,
       archetype: player.archetype,
       dialectTag: player.dialectTag || '',
       yieldStyle: player.yieldStyle || 'YIELD_POLITELY',
+      namuwikiProfile: player.namuwikiProfile || null,
       personality: player.personality,
       speechStyle: player.speechStyle,
       roleId: myRole.roleId,

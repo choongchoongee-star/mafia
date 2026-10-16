@@ -3,13 +3,13 @@
  */
 
 const PHOTOREALISTIC_PORTRAIT_ANCHORS = {
-  mc_jaesuk: '/generated/portrait_mc_jaesuk.png',
-  idol_wonyoung: '/generated/portrait_idol_wonyoung.png',
-  idol_karina: '/generated/portrait_idol_karina.png',
-  idol_sullyoon: '/generated/portrait_idol_sullyoon.png',
-  idol_yuna: '/generated/portrait_idol_yuna.png',
-  idol_chaewon: '/generated/portrait_idol_chaewon.png',
-  idol_hanni: '/generated/portrait_idol_hanni.png'
+  mc_jaesuk: '/generated/portrait_mc_jaesuk.png?v=4k_v2',
+  idol_wonyoung: '/generated/portrait_idol_wonyoung.png?v=4k_v2',
+  idol_karina: '/generated/portrait_idol_karina.png?v=4k_v2',
+  idol_sullyoon: '/generated/portrait_idol_sullyoon.png?v=4k_v2',
+  idol_yuna: '/generated/portrait_idol_yuna.png?v=4k_v2',
+  idol_chaewon: '/generated/portrait_idol_chaewon.png?v=4k_v2',
+  idol_hanni: '/generated/portrait_idol_hanni.png?v=4k_v2'
 };
 
 const state = {
@@ -33,10 +33,12 @@ const state = {
   audioEnabled: true,
   roleMasked: false,
   spoilersRevealed: false,
-  localPhaseRemainingSec: 20,
+  localPhaseRemainingSec: 45,
   discussionElapsedSec: 0,
   lastAutoBeatSec: 0,
+  lastTurnFinishedAt: 0,
   isBusyRequest: false,
+  isWaitingServer: false,
   preferredRole: 'RANDOM',
   gameStartSeq: 0,
   portraitImages: new Map(),
@@ -69,6 +71,7 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
   const mySeq = (state.gameStartSeq || 0) + 1;
   state.gameStartSeq = mySeq;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   state.selectedProposalIds.clear();
   stopActiveSpeech();
 
@@ -92,6 +95,7 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
       })
     });
     const data = await response.json();
+    state.isWaitingServer = false;
     if (!response.ok) throw new Error(data.error || 'Failed to start game');
     if (mySeq !== state.gameStartSeq) return;
 
@@ -99,10 +103,15 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
     resetPhaseClock(data.board.phaseTimerSec);
 
     if (data.latestTurn) {
-      playTurnVoiceAndHighlight(data.latestTurn);
+      await playTurnVoiceAndHighlight(data.latestTurn);
     }
+    state.lastTurnFinishedAt = Date.now();
 
-    if (state.board.phase === 'TEAM_PROPOSAL' && state.board.leaderId !== 'player_human') {
+    if (
+      mySeq === state.gameStartSeq &&
+      state.board.phase === 'TEAM_PROPOSAL' &&
+      state.board.leaderId !== 'player_human'
+    ) {
       const targetGameId = state.gameId;
       setTimeout(() => {
         if (
@@ -112,11 +121,12 @@ async function startNewGame(demoPreset = 'STANDARD', preferredRoleOverride = nul
         ) {
           triggerTeamProposal([]);
         }
-      }, 2400);
+      }, 1200);
     }
   } catch (err) {
     console.error('Error starting new game:', err);
   } finally {
+    state.isWaitingServer = false;
     if (mySeq === state.gameStartSeq) {
       state.isBusyRequest = false;
     }
@@ -194,9 +204,10 @@ async function syncPhaseAdaptiveBgm() {
  * @param {number} seconds
  */
 function resetPhaseClock(seconds) {
-  state.localPhaseRemainingSec = Number(seconds) || 20;
+  state.localPhaseRemainingSec = Number(seconds) || 45;
   state.discussionElapsedSec = 0;
   state.lastAutoBeatSec = 0;
+  state.lastTurnFinishedAt = Date.now();
   updateTimerDisplay();
 }
 
@@ -274,14 +285,18 @@ function renderSidebarVoiceMembers() {
   const allCallParticipants = [
     {
       id: 'mc_jaesuk',
-      name: 'MC Jae-suk',
+      name: state.mcHost?.name || 'MC Jae-ho',
+      koreanName: state.mcHost?.koreanName || '유재호',
+      namuwikiProfile: state.mcHost?.namuwikiProfile || null,
       tag: 'Host',
       avatar: PHOTOREALISTIC_PORTRAIT_ANCHORS.mc_jaesuk
     },
     ...state.players.map((p) => ({
       id: p.id,
       name: p.isHuman ? 'Guest (You)' : p.name,
-      tag: state.board?.leaderId === p.id ? 'Leader' : p.isHuman ? 'You' : '',
+      koreanName: p.koreanName || '',
+      namuwikiProfile: p.namuwikiProfile || null,
+      tag: state.board?.leaderId === p.id ? 'Leader' : p.isHuman ? 'You' : p.namuwikiProfile?.mbti?.split(' ')[0] || '',
       avatar: PHOTOREALISTIC_PORTRAIT_ANCHORS[p.id] || null
     }))
   ];
@@ -289,13 +304,17 @@ function renderSidebarVoiceMembers() {
   listEl.innerHTML = allCallParticipants
     .map((m) => {
       const isSpeaking = state.activeSpeakerId === m.id;
+      const displayName = m.koreanName ? `${m.name} (${m.koreanName})` : m.name;
+      const namuTooltip = m.namuwikiProfile
+        ? `[나무위키 프로필] Motif: ${m.namuwikiProfile.motif} | MBTI: ${m.namuwikiProfile.mbti} | Likes: ${(m.namuwikiProfile.favoriteFoods || []).join(', ')} | Nicknames: ${(m.namuwikiProfile.nicknames || []).join(', ')}`
+        : displayName;
       const avatarHtml = m.avatar
         ? `<img class="vm-avatar" src="${m.avatar}" alt="${m.name}" />`
         : `<div class="vm-avatar" style="display:flex;align-items:center;justify-content:center;background:#5865f2;color:#fff;font-size:10px;font-weight:700;">G</div>`;
       return `
-        <div class="voice-member-row ${isSpeaking ? 'speaking' : ''}" data-member-id="${m.id}">
+        <div class="voice-member-row ${isSpeaking ? 'speaking' : ''}" data-member-id="${m.id}" title="${namuTooltip.replace(/"/g, '&quot;')}">
           ${avatarHtml}
-          <span class="vm-name">${m.name}</span>
+          <span class="vm-name">${displayName}</span>
           ${m.tag ? `<span class="vm-tag">${m.tag}</span>` : ''}
         </div>
       `;
@@ -475,8 +494,8 @@ function renderPhaseActionBanner() {
 
 /**
  * Renders the 8-Tile (4x2) 16:9 Discord Video Call Stage:
- * Tile 1: MC Jae-suk (Host)
- * Tiles 2–7: 6 K-Pop Idols
+ * Tile 1: MC Jae-ho (Host)
+ * Tiles 2–7: 6 K-Pop Idols (Seoyoung, Rina, Seol-ah, Yura, Chaerin, Hana)
  * Tile 8: Guest (Human Player)
  */
 function renderZoomGrid() {
@@ -489,7 +508,9 @@ function renderZoomGrid() {
   const allTiles = [
     {
       id: 'mc_jaesuk',
-      name: 'MC Jae-suk',
+      name: state.mcHost?.name || 'MC Jae-ho',
+      koreanName: state.mcHost?.koreanName || '유재호',
+      namuwikiProfile: state.mcHost?.namuwikiProfile || null,
       isMc: true,
       isHuman: false
     },
@@ -501,9 +522,18 @@ function renderZoomGrid() {
 
   if (container.children.length !== allTiles.length) {
     container.innerHTML = allTiles
-      .map(
-        (participant) => `
-        <div class="zoom-tile" id="tile_${participant.id}" data-player-id="${participant.id}">
+      .map((participant) => {
+        const displayName = participant.isHuman
+          ? 'Guest (You)'
+          : participant.koreanName
+            ? `${participant.name} (${participant.koreanName})`
+            : participant.name;
+        const namu = participant.namuwikiProfile;
+        const namuTooltip = namu
+          ? `[나무위키 프로필] Motif: ${namu.motif} | MBTI: ${namu.mbti} | Favorite Foods: ${(namu.favoriteFoods || []).join(', ')} | Nicknames: ${(namu.nicknames || []).join(', ')} | Habit: ${namu.iconicHabits || ''}`
+          : displayName;
+        return `
+        <div class="zoom-tile" id="tile_${participant.id}" data-player-id="${participant.id}" title="${namuTooltip.replace(/"/g, '&quot;')}">
           <div class="tile-media-layer">
             <canvas id="canvas_${participant.id}" width="640" height="360"></canvas>
             <video id="video_${participant.id}" class="hidden" autoplay loop muted playsinline></video>
@@ -517,11 +547,11 @@ function renderZoomGrid() {
             <div class="audio-waveform-bars">
               <span></span><span></span><span></span><span></span>
             </div>
-            <span class="tile-participant-name">${participant.isHuman ? 'Guest (You)' : participant.name}</span>
+            <span class="tile-participant-name">${displayName}</span>
           </div>
         </div>
-      `
-      )
+      `;
+      })
       .join('');
 
     allTiles.forEach((participant) => {
@@ -568,7 +598,7 @@ function renderZoomGrid() {
 
     const leftHtml = [];
     if (participant.isMc) {
-      leftHtml.push('<span class="tile-badge">🎙️ Variety Host</span>');
+      leftHtml.push('<span class="tile-badge">🎙️ Variety Host • ISFP</span>');
     } else {
       if (board.leaderId === participant.id) {
         leftHtml.push('<span class="tile-badge leader-crown">👑 Leader</span>');
@@ -579,7 +609,10 @@ function renderZoomGrid() {
         leftHtml.push('<span class="tile-badge leader-crown">✓ Selected</span>');
       }
       if (participant.dialectTag) {
-        leftHtml.push(`<span class="tile-badge">${participant.dialectTag}</span>`);
+        const mbtiShort = participant.namuwikiProfile?.mbti?.split(' ')[0] || '';
+        leftHtml.push(
+          `<span class="tile-badge">${participant.dialectTag}${mbtiShort ? ` • ${mbtiShort}` : ''}</span>`
+        );
       }
     }
     leftBadges.innerHTML = leftHtml.join('');
@@ -791,6 +824,7 @@ function renderTranscriptAndXray() {
 async function triggerTeamProposal(proposedTeamIds = []) {
   if (!state.gameId || state.isBusyRequest) return;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   try {
     const res = await fetch(`/api/game/${state.gameId}/propose`, {
       method: 'POST',
@@ -801,15 +835,18 @@ async function triggerTeamProposal(proposedTeamIds = []) {
       })
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
       if (data.leaderTurn) {
-        playTurnVoiceAndHighlight(data.leaderTurn);
+        await playTurnVoiceAndHighlight(data.leaderTurn);
       }
+      state.lastTurnFinishedAt = Date.now();
     }
   } catch (err) {
     console.error('Proposal error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
 }
@@ -823,7 +860,14 @@ async function triggerDiscussionStep(humanMessage = null) {
   if (!state.gameId || state.isBusyRequest) return;
   if (state.board?.phase !== 'DISCUSSION') return;
 
+  // If the human player actively speaks when under 35s remain, grant +20s (up to 180s max)
+  if (humanMessage && state.localPhaseRemainingSec < 35) {
+    state.localPhaseRemainingSec = Math.min(180, state.localPhaseRemainingSec + 20);
+    updateTimerDisplay();
+  }
+
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   try {
     const res = await fetch(`/api/game/${state.gameId}/discuss/step`, {
       method: 'POST',
@@ -836,6 +880,7 @@ async function triggerDiscussionStep(humanMessage = null) {
       })
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
       if (data.yieldTurn) {
@@ -846,32 +891,38 @@ async function triggerDiscussionStep(humanMessage = null) {
       if (data.latestTurn) {
         await playTurnVoiceAndHighlight(data.latestTurn);
       }
+      state.lastTurnFinishedAt = Date.now();
     }
   } catch (err) {
     console.error('Discussion step error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
 }
 
 /**
- * Transitions from DISCUSSION to TEAM_VOTE (15s timer).
+ * Transitions from DISCUSSION to TEAM_VOTE (30s timer).
  */
 async function triggerCallVotePhase() {
   if (!state.gameId || state.isBusyRequest) return;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   stopActiveSpeech();
   try {
     const res = await fetch(`/api/game/${state.gameId}/call-vote`, {
       method: 'POST'
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
+      state.lastTurnFinishedAt = Date.now();
     }
   } catch (err) {
     console.error('Call vote error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
 }
@@ -883,6 +934,7 @@ async function triggerCallVotePhase() {
 async function triggerSubmitVote(humanVote = null) {
   if (!state.gameId || state.isBusyRequest) return;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   try {
     const res = await fetch(`/api/game/${state.gameId}/vote`, {
       method: 'POST',
@@ -893,11 +945,13 @@ async function triggerSubmitVote(humanVote = null) {
       })
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
       if (data.latestTurn) {
-        playTurnVoiceAndHighlight(data.latestTurn);
+        await playTurnVoiceAndHighlight(data.latestTurn);
       }
+      state.lastTurnFinishedAt = Date.now();
       if (
         state.board.phase === 'TEAM_PROPOSAL' &&
         state.board.leaderId !== 'player_human'
@@ -906,7 +960,7 @@ async function triggerSubmitVote(humanVote = null) {
           if (state.board?.phase === 'TEAM_PROPOSAL' && state.board.leaderId !== 'player_human') {
             triggerTeamProposal([]);
           }
-        }, 3200);
+        }, 1200);
       }
       if (
         state.board.phase === 'QUEST_EXECUTION' &&
@@ -916,12 +970,13 @@ async function triggerSubmitVote(humanVote = null) {
           if (state.board?.phase === 'QUEST_EXECUTION') {
             triggerSubmitQuestCard('SUCCESS');
           }
-        }, 3200);
+        }, 1200);
       }
     }
   } catch (err) {
     console.error('Vote submission error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
 }
@@ -933,6 +988,7 @@ async function triggerSubmitVote(humanVote = null) {
 async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
   if (!state.gameId || state.isBusyRequest) return;
   state.isBusyRequest = true;
+  state.isWaitingServer = true;
   try {
     const res = await fetch(`/api/game/${state.gameId}/quest`, {
       method: 'POST',
@@ -943,11 +999,13 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
       })
     });
     const data = await res.json();
+    state.isWaitingServer = false;
     if (res.ok) {
       applyServerGameState(data);
       if (data.latestTurn) {
-        playTurnVoiceAndHighlight(data.latestTurn);
+        await playTurnVoiceAndHighlight(data.latestTurn);
       }
+      state.lastTurnFinishedAt = Date.now();
       if (
         state.board.phase === 'TEAM_PROPOSAL' &&
         state.board.leaderId !== 'player_human'
@@ -956,7 +1014,7 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
           if (state.board?.phase === 'TEAM_PROPOSAL' && state.board.leaderId !== 'player_human') {
             triggerTeamProposal([]);
           }
-        }, 3500);
+        }, 1200);
       }
       if (
         state.board.phase === 'ASSASSIN_PHASE' &&
@@ -966,12 +1024,13 @@ async function triggerSubmitQuestCard(humanQuestCard = 'SUCCESS') {
           if (state.board?.phase === 'ASSASSIN_PHASE') {
             triggerAssassination(null);
           }
-        }, 4200);
+        }, 1500);
       }
     }
   } catch (err) {
     console.error('Quest execution error:', err);
   } finally {
+    state.isWaitingServer = false;
     state.isBusyRequest = false;
   }
 }
@@ -1261,23 +1320,30 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman }) {
 }
 
 /**
- * 1-Second Autonomous Phase Timer & Bystander Detection Loop.
+ * 1-Second Autonomous Phase Timer & 6-Agent Parallel Floor Handoff Loop.
+ * Pauses phase countdown during server LLM/TTS API requests (`state.isWaitingServer`)
+ * and triggers the next 6-Idol parallel floor bid (`Promise.all`) ~2.6s after
+ * the previous speaker finishes their utterance.
  */
 function startAutonomousPhaseTimer() {
   setInterval(() => {
     if (!state.board || state.board.phase === 'GAME_OVER') return;
 
-    if (state.localPhaseRemainingSec > 0) {
+    // Pause phase countdown while waiting on server LLM/TTS API so latency never penalizes the player
+    if (state.localPhaseRemainingSec > 0 && !state.isWaitingServer) {
       state.localPhaseRemainingSec -= 1;
     }
 
     if (state.board.phase === 'DISCUSSION') {
-      state.discussionElapsedSec += 1;
+      if (!state.isWaitingServer) {
+        state.discussionElapsedSec += 1;
+      }
       renderHeaderBoard();
 
+      const msSinceLastTurnFinished = Date.now() - (state.lastTurnFinishedAt || 0);
       if (
-        state.discussionElapsedSec - state.lastAutoBeatSec >= 11 &&
         !state.isBusyRequest &&
+        msSinceLastTurnFinished >= 2600 &&
         state.localPhaseRemainingSec > 4
       ) {
         state.lastAutoBeatSec = state.discussionElapsedSec;

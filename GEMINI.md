@@ -34,6 +34,12 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:47 KST] Task 16: Realistic 7-Player Avalon Phase Timers (`45s / 180s / 30s / 25s / 60s`) & Zero-Wait 6-Agent Parallel Floor Handoff**
+  - **Action**:
+    1. Updated [docs/spec-core.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-core.md), [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js), [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`PHASE_TIMERS_SEC`) to realistic 7-player Avalon pacing: `TEAM_PROPOSAL: 45s`, `DISCUSSION: 180s`, `TEAM_VOTE: 30s`, `QUEST_EXECUTION: 25s`, and `ASSASSIN_PHASE: 60s`.
+    2. Removed the legacy frontend 11-second polling wait (`state.discussionElapsedSec - state.lastAutoBeatSec >= 11`) in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`startAutonomousPhaseTimer`) so that as soon as any speaker finishes their audio (`state.lastTurnFinishedAt`), the next 6-Idol parallel floor bid (`Promise.all(aiPlayers.map(idol => evaluateSingleIdolFloorBid(...)))`) fires after a natural `2.6s` breath.
+    3. Added `state.isWaitingServer` clock pausing during LLM/TTS API requests and automatic `+20s` discussion extension (up to `180s`) when the human player speaks with `< 35s` left.
+  - **Result**: Verified live via `/api/game/new` (`phaseTimerSec=45`) and `/api/game/:id/propose` (`phaseTimerSec=180`), syntax checked (`node --check`), pushed to GitHub, and redeployed to Google Cloud Run.
 - **[2026-10-16 13:37 KST] Task 15: 3-Zone Consolidated & Labeled Button Architecture**
   - **Action**:
     1. Eliminated duplicate/cryptic buttons across the Far-Left Rail, Left Sidebar, Top Stage Bar, and Bottom Dock in [public/index.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/index.html), [public/styles.css](file:///c:/Users/Charlie/Business/Projects/mafia/public/styles.css), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
@@ -61,8 +67,4 @@
     3. Built a true **6-Agent Independent Parallel Floor Negotiation Engine** (`evaluateSingleIdolFloorBid` via `Promise.all`) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) where all 6 NPC agents simultaneously evaluate their isolated `PrivatePlayerView` (`roleName`, `nightVisionText`, Bayesian suspicion) and output `intent: 'INTERRUPT' | 'SPEAK' | 'HOLD_SILENT'`, `urgency: 0..100`, and `innerThought`.
     4. Implemented **Simultaneous Mic Clash & Polite Yield (`COLLISION_YIELD`)** across [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js), [server.js](file:///c:/Users/Charlie/Business/Projects/mafia/server.js), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
   - **Result**: Verified syntax (`node --check`), verified live 6-agent mic-clash & dialect response on `http://localhost:8080`, pushed to GitHub, and redeployed to Google Cloud Run.
-- **[2026-10-16 13:11 KST] Task 11: Real `.mp4` Studio Webcam Feeds (`gemini-omni-1.1-flash`), Role Preference Selector & Hackathon Deliverables**
-  - **Action**:
-    1. Generated studio assets and added optional Role Preference Selector (`#preferredRoleSelect`: `RANDOM`, `MERLIN`, `PERCIVAL`, `LOYAL_SERVANT`, `ASSASSIN`, `MORGANA`, `OBERON`) across [src/avalonEngine.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/avalonEngine.js), [server.js](file:///c:/Users/Charlie/Business/Projects/mafia/server.js), and [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js).
-    2. Created [DESIGN.md](file:///c:/Users/Charlie/Business/Projects/mafia/DESIGN.md), [AGENTS.md](file:///c:/Users/Charlie/Business/Projects/mafia/AGENTS.md), [SUBMISSION.md](file:///c:/Users/Charlie/Business/Projects/mafia/SUBMISSION.md), and [public/architecture.html](file:///c:/Users/Charlie/Business/Projects/mafia/public/architecture.html).
-  - **Result**: Verified live on `http://localhost:8080`, pushed to GitHub, and redeployed to Google Cloud Run.
+

@@ -90,44 +90,43 @@ To ensure rounds never drag and the game runs autonomously even if the human pla
 ```mermaid
 stateDiagram-v2
     [*] --> NightReveal : Randomize 7 Roles + Epistemic Views (10s)
-    NightReveal --> TeamProposal : MC Jae-suk Announces Quest & Leader (20s Timer)
-    TeamProposal --> DiscussionDebate : Leader Locks Team of N Players (75s Timer)
-    DiscussionDebate --> TeamVote : Timer Hits 0:00 or Early Vote Called (15s Timer)
+    NightReveal --> TeamProposal : MC Jae-ho Announces Quest & Leader (45s Timer)
+    TeamProposal --> DiscussionDebate : Leader Locks Team of N Players (180s Timer)
+    DiscussionDebate --> TeamVote : Timer Hits 0:00 or Early Vote Called (30s Timer)
     TeamVote --> TeamProposal : Majority Reject (< 4 Approve) & RejectCount < 5
     TeamVote --> GameOverEvil : 5th Consecutive Reject (Hammer Loss)
-    TeamVote --> QuestExecution : Majority Approve (>= 4 Approve) (15s Timer)
-    QuestExecution --> QuestReveal : MC Jae-suk Reveals Shuffled Cards (10s)
+    TeamVote --> QuestExecution : Majority Approve (>= 4 Approve) (25s Timer)
+    QuestExecution --> QuestReveal : MC Jae-ho Reveals Shuffled Cards (10s)
     QuestReveal --> TeamProposal : Good < 3 & Evil < 3 (Next Quest)
     QuestReveal --> GameOverEvil : 3 Quests Failed
-    QuestReveal --> AssassinPhase : 3 Quests Succeeded (30s Timer)
+    QuestReveal --> AssassinPhase : 3 Quests Succeeded (60s Timer)
     AssassinPhase --> GameOverEvil : Assassin Shoots Merlin
     AssassinPhase --> GameOverGood : Assassin Misses Merlin
 ```
 
 ### 4.1 Phase Timer Rules & Autonomous Fallbacks
 1. **Night Phase & Role Reveal (`10 seconds`)**:
-   - **MC Jae-suk** introduces the session in `#avalon-stage-7p` and triggers the secret role reveal card in the Discord sidebar for the Human Player (showing the Human's random role and exact night-phase knowledge, e.g., if Percival, highlights the 2 Merlin/Morgana candidates on the Discord stage grid).
-2. **Team Proposal Phase (`20 seconds`)**:
-   - **If an AI Idol is Leader**: `gemini-4-argon` selects the optimal `N`-player team based on her private role view and Bayesian suspicion matrix within ~3–5 seconds and announces her proposal.
-   - **If the Human Player is Leader**: The Human has **20 seconds** to toggle `N` players on the Discord stage grid and click **"Propose Team"**. If the 20s timer expires without submission, **MC Jae-suk** playfully intervenes (*"Time's up, Guest-nim! Let's lock in a balanced squad!"*) and auto-fills the remaining slots so the game never stalls.
-3. **Discussion & Live Debate Phase (`75 seconds` — Option A Spotlight + Free Interrupt)**:
-   - **Autonomous Multi-Agent Turn Scheduler**:
-     - Every ~8–12 seconds during the 75-second window, the **Floor Manager (`gemini-4-argon`)** selects the next idol who has the strongest strategic reason to speak (e.g., the Leader defending her pick, an idol left off the team objecting, a player accused in the previous turn counter-attacking, or Merlin subtly steering the table).
-     - **Zero Predetermined Scripts**: Every single utterance is generated **live** by the LLM conditioned on the exact current proposal, vote history, quest math, and the live chat transcript up to that millisecond.
+   - **MC Jae-ho** introduces the session in `#avalon-stage-7p` and triggers the secret role reveal card in the Discord sidebar for the Human Player (showing the Human's selected/random role and exact night-phase knowledge, e.g., if Percival, highlights the 2 Merlin/Morgana candidates on the Discord stage grid).
+2. **Team Proposal Phase (`45 seconds`)**:
+   - **If an AI Idol is Leader**: `gemini-4-argon` selects the optimal `N`-player team based on her private role view and Bayesian suspicion matrix right after MC Jae-ho's intro finishes and announces her proposal.
+   - **If the Human Player is Leader**: The Human has **45 seconds** to review previous vote/quest history, toggle `N` players on the Discord stage grid, and click **"Propose Team"**. If the 45s timer expires without submission, **MC Jae-ho** playfully intervenes and auto-fills the remaining slots so the game never stalls.
+3. **Discussion & Live Debate Phase (`180 seconds / 3 minutes` — 6-Agent Parallel Floor Negotiation)**:
+   - **6 Independent Idol Agents (`Promise.all`)**:
+     - Rather than a single central controller or a slow 11-second polling loop, all **6 AI Idol Agents** simultaneously evaluate the board from their isolated `PrivatePlayerView` in parallel (`Promise.all`) and bid `{ intent: 'INTERRUPT' | 'SPEAK' | 'HOLD_SILENT', urgency: 0..100, innerThought, text }`.
+     - As soon as the current speaker's voice playback finishes (plus a natural ~2.5-second conversational breath), the next parallel 6-agent floor negotiation fires automatically (including simultaneous Mic Clash & Polite Yield `COLLISION_YIELD` when two idols unmute together).
+     - **Zero Predetermined Scripts**: Every single utterance is generated **live** conditioned on the exact current proposal, vote history, quest math, and the live chat transcript up to that millisecond.
    - **Human Input (Voice or Text Anytime)**:
-     - Whenever the Human types a message or speaks via mic, the Floor Manager **immediately prioritizes** the Human's statement so the addressed idol(s) or the table directly answers the Human's point on the very next beat!
+     - Whenever the Human types a message or speaks via mic, all 6 Idol Agents immediately evaluate the Human's statement in parallel so the most relevant idol directly answers the Human's point on the very next beat!
    - **Bystander / Silence Detection (When Human Stays Quiet)**:
-     - The Game State tracks `humanMessagesInRound`. If `35+ seconds` have elapsed in the round (or across consecutive rounds) and `humanMessagesInRound == 0`, the Floor Manager injects a `BYSTANDER_ALERT` into the idols' and MC Jae-suk's live context.
-     - Idols and MC Jae-suk will organically call out the Human's silence (e.g., *"Wait, Guest hasn't said a word since Quest 1! Are you Merlin trying not to get noticed by the Assassin, or are you Evil letting us fight each other?"*) and factor that silence into their suspicion matrix—while **continuing to lead and play the game seamlessly on their own**!
-   - **Early Vote Trigger**: The Human can click **"Call for Vote Now"** at any time to skip the remaining discussion timer and jump straight to voting, or let the 75s timer naturally hit `0:00`.
-4. **Team Vote Phase (`15 seconds`)**:
+     - The Game State tracks `humanMessagesInRound`. If `24+ seconds` have elapsed in the round and `humanMessagesInRound == 0`, a `BYSTANDER_ALERT` is injected into the idols' and MC Jae-ho's live context.
+   - **Early Vote Trigger**: The Human can click **"Start Vote"** at any time to skip the remaining discussion timer and jump straight to voting, or let the 180s timer naturally hit `0:00`.
+4. **Team Vote Phase (`30 seconds`)**:
    - All 6 AI Idols compute their `APPROVE` or `REJECT` vote in parallel via `gemini-3.8-flash` / `gemini-4-argon` (along with a 1-sentence reason and hidden inner monologue).
-   - The Human has **15 seconds** to click **`APPROVE (⭕)`** or **`REJECT (❌)`**. If the Human is inactive when the 15s timer expires, an automatic `APPROVE` (if on the team) or `REJECT` (if off the team) is cast so the reveal proceeds immediately.
+   - The Human has **30 seconds** to click **`Approve`** or **`Reject`**. If the Human is inactive when the 30s timer expires, an automatic vote is cast so the reveal proceeds immediately.
    - All 7 votes flip simultaneously on the Discord stage tiles!
-5. **Quest Execution Phase (`15 seconds`)**:
-   - Only the `N` approved team members act.
-   - AI Idols on the team secretly submit `SUCCESS` or `FAIL` based on their alignment and `gemini-4-argon` tactical decision (e.g., an Evil idol might play `SUCCESS` on a 2-player Quest 1 to gain trust, or `FAIL` on Quest 3 to take the lead).
-   - If the Human is on the Quest Team, they have **15 seconds** to click `SUCCESS` (or `FAIL` if Evil). If the timer expires, `SUCCESS` is auto-submitted.
+5. **Quest Execution Phase (`25 seconds`) & Assassin Phase (`60 seconds`)**:
+   - Only the `N` approved team members act during `QUEST_EXECUTION` (`25 seconds`).
+   - If Good passes 3 Quests, `ASSASSIN_PHASE` gives **60 seconds** for the Assassin to review the full game history and shoot Merlin.
 
 ---
 
