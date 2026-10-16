@@ -34,6 +34,9 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 12:19 KST] Task 5: `.env` File Creation & Hot-Reload Support**
+  - **Action**: Created local [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (excluded from git via [.gitignore](file:///c:/Users/Charlie/Business/Projects/mafia/.gitignore)) and updated [`hasGeminiApiKey`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L53-L68) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) to automatically hot-reload `GEMINI_API_KEY` from `.env` on disk without requiring a server restart.
+  - **Result**: Ready for user to paste `GEMINI_API_KEY` into [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env).
 - **[2026-10-16 12:17 KST] Task 4: GitHub Repository Commit & Push**
   - **Action**: Verified zero secrets/API keys in tracked files, staged `package-lock.json` and all source/documentation files, configured remote `origin` (`https://github.com/choongchoongee-star/mafia.git`), and pushed initial release to GitHub.
   - **Result**: Public repository live and synchronized.

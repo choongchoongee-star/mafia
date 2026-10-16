@@ -16,6 +16,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import {
   MC_HOST_PROFILE,
@@ -27,6 +28,7 @@ import {
 } from './avalonEngine.js';
 
 let runtimeApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+const envFilePath = path.resolve(process.cwd(), '.env');
 const generatedDir = path.resolve(process.cwd(), 'public', 'generated');
 if (!fs.existsSync(generatedDir)) {
   fs.mkdirSync(generatedDir, { recursive: true });
@@ -49,10 +51,23 @@ export function setRuntimeGeminiApiKey(newKey) {
 }
 
 /**
- * Returns whether a live Gemini API key is configured.
+ * Returns whether a live Gemini API key is configured (auto-reloading `.env` if updated).
  * @returns {boolean}
  */
 export function hasGeminiApiKey() {
+  if (!runtimeApiKey || runtimeApiKey === 'your_gemini_api_key_here') {
+    try {
+      if (fs.existsSync(envFilePath)) {
+        const parsed = dotenv.parse(fs.readFileSync(envFilePath, 'utf8'));
+        const candidate = (parsed.GEMINI_API_KEY || parsed.GOOGLE_API_KEY || '').trim();
+        if (candidate && candidate !== 'your_gemini_api_key_here' && candidate.length > 5) {
+          runtimeApiKey = candidate;
+        }
+      }
+    } catch {
+      // Ignore transient read errors
+    }
+  }
   return Boolean(runtimeApiKey && runtimeApiKey !== 'your_gemini_api_key_here');
 }
 
