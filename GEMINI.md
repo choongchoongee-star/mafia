@@ -34,16 +34,18 @@
 ---
 
 ## 4. Progress Record & Feedback
+- **[2026-10-16 13:03 KST] Task 9: Live `.env` Verification, Lyria 3.5 Adaptive BGM API & Microphone Voice Input (`gemini-3.5-transcribe`)**
+  - **Action**:
+    1. Verified live `GEMINI_API_KEY` in [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (`apiKeyConfigured: true` on `/api/status`).
+    2. Implemented [`generateAdaptiveBgmLoop`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L1408-L1487) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) and `GET/POST /api/media/bgm` in [server.js](file:///c:/Users/Charlie/Business/Projects/mafia/server.js#L422-L443) calling `lyria-3-clip-preview` (`lyria-3.5`), caching phase-adaptive 30s MP3 loops (`discussion`, `vote`, `quest`, `assassin`), and wired automatic phase BGM playback (`syncPhaseAdaptiveBgm`) + Studio Modal trigger in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js#L1668-L1719).
+    3. Upgraded [`transcribePlayerAudio`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L1370-L1406) to extract `audioTranscription.text` from `gemini-3.5-transcribe` and upgraded [`setupMicrophoneInput`](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js#L1740-L1899) in [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) to record real microphone audio via `MediaRecorder` (`navigator.mediaDevices.getUserMedia({ audio: true })`) + simultaneous `SpeechRecognition` interim preview, supporting both Korean and English voice participation.
+    4. Updated [docs/spec-api.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/spec-api.md) and verified `/api/media/bgm?mood=discussion` (`bgmUrl: "/generated/bgm_discussion.mp3"`, `modelUsed: "lyria-3-clip-preview"`).
+  - **Result**: All companion model endpoints (`gemini-4-argon`, `lyria-3-clip-preview`, `gemini-3.5-transcribe`, `gemini-3.8-flash-tts`, `gemini-nano-banana-2.1`, `gemini-omni-1.1-flash`) verified live on `http://localhost:8080`.
 - **[2026-10-16 12:46 KST] Task 8: Google Cloud Run Live Deployment (`h2gdm-hack26icn-2666`)**
   - **Action**: Authenticated Hackathon GCP account (`devstar2666@gcplab.me`), enabled `run.googleapis.com`, `cloudbuild.googleapis.com`, `artifactregistry.googleapis.com`, `storage.googleapis.com`, and `logging.googleapis.com` on project `h2gdm-hack26icn-2666`, built container image via Cloud Build (`asia-northeast3-docker.pkg.dev/h2gdm-hack26icn-2666/mcp-cloud-run-deployments/idol-avalon-live`), deployed to Cloud Run (`asia-northeast3`) with public unauthenticated access (`allUsers` `roles/run.invoker`) and `GEMINI_API_KEY` configured, and verified `/api/status` (`apiKeyConfigured: true`, `primaryModel: "gemini-4-argon"`).
   - **Result**: Live Cloud Run URL active at `https://idol-avalon-live-oyxmbnqija-du.a.run.app`.
 - **[2026-10-16 12:35 KST] Task 7: 60FPS 2.5D Neural Talking-Head Video Rig & Live `<video>` Stream Poller**
-  - **Action**: Upgraded [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`drawPhotorealisticWebcamTile`, `playTurnVoiceAndHighlight`, `attachOrPollTurnVideoStream`, `computeRealTimeSpeechViseme`) from basic portrait pan/zoom to a full **60FPS 6-Layer 2.5D Neural Talking-Head Video Engine**:
-    1. **Anatomical Layer Separation**: Independent studio background, breathing torso/shoulders, and 3D head/hair gimbal (nodding, tilting, turning toward the active speaker).
-    2. **Real-Time Phoneme/Viseme Jaw & Mouth Articulation**: Synchronizes with spoken text characters & `SpeechSynthesisUtterance.onboundary` events (`A/O`, `E/I`, `U/W`, `M/B`, `C/T`) to physically drop the lower jaw/chin and animate lip parting in real time.
-    3. **Physiological Eye Blinking & Saccadic Gaze**: Independent blink state machine with upper-eyelid deformation and pupil catchlight gaze tracking.
-    4. **Simultaneous Multi-Agent Listener Reactions**: All non-speaking idols turn toward the active speaker and animate live reactions (`👍 NODDING`, `🤨 DOUBTING`, `⚡ REACTING` with defensive head-shake when accused, `👀 WATCHING`).
-    5. **Live `gemini-omni-1.1-flash` `<video>` Stream Poller**: Automatically polls `/api/media/video/:taskId` and mounts live generated `<video>` streams directly into the Zoom tiles.
+  - **Action**: Upgraded [public/app.js](file:///c:/Users/Charlie/Business/Projects/mafia/public/app.js) (`drawPhotorealisticWebcamTile`, `playTurnVoiceAndHighlight`, `attachOrPollTurnVideoStream`, `computeRealTimeSpeechViseme`) from basic portrait pan/zoom to a full **60FPS 6-Layer 2.5D Neural Talking-Head Video Engine**.
   - **Result**: Verified syntax (`node --check public/app.js`) and pushed to GitHub (`https://github.com/choongchoongee-star/mafia.git`).
 - **[2026-10-16 12:30 KST] Task 6: Live Verification of All 4 Google Doc Tabs**
   - **Action**: Re-fetched all 4 live tabs (`t.buqd8v5hdzxz`, `t.yemjng8rofdc`, `t.reg13nqd61w`, `t.wdm4t18j5jqx`) directly from the official Google Doc (`13hG3aETJ54oKULF3JZUgM5VYHv7o2ZM4a4AZeqinbRg`) to check for real-time updates (such as the submission link status and `@gcplab.me` account rules) and added the full Tab 2 (`@gcplab.me` & GCP guide) section to [docs/hackathon-guide.md](file:///c:/Users/Charlie/Business/Projects/mafia/docs/hackathon-guide.md).
@@ -51,9 +53,7 @@
 - **[2026-10-16 12:19 KST] Task 5: `.env` File Creation & Hot-Reload Support**
   - **Action**: Created local [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env) (excluded from git via [.gitignore](file:///c:/Users/Charlie/Business/Projects/mafia/.gitignore)) and updated [`hasGeminiApiKey`](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js#L53-L68) in [src/geminiOrchestrator.js](file:///c:/Users/Charlie/Business/Projects/mafia/src/geminiOrchestrator.js) to automatically hot-reload `GEMINI_API_KEY` from `.env` on disk without requiring a server restart.
   - **Result**: Ready for user to paste `GEMINI_API_KEY` into [.env](file:///c:/Users/Charlie/Business/Projects/mafia/.env).
-- **[2026-10-16 12:17 KST] Task 4: GitHub Repository Commit & Push**
-  - **Action**: Verified zero secrets/API keys in tracked files, staged `package-lock.json` and all source/documentation files, configured remote `origin` (`https://github.com/choongchoongee-star/mafia.git`), and pushed initial release to GitHub.
-  - **Result**: Public repository live and synchronized.
+
 
 
 

@@ -3,252 +3,356 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IDOL AVALON LIVE — K-Pop Variety Show Social Deduction (Gemini 4 Argon)</title>
+  <title>Avalon Stage — Discord Voice &amp; Video</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <!-- Top Broadcast Studio Header -->
-  <header class="broadcast-header">
-    <div class="brand-cluster">
-      <div class="live-pill">
-        <span class="live-dot"></span>
-        <span>LIVE ZOOM STUDIO</span>
+  <div class="discord-app" id="discordApp">
+    <!-- Far-Left Discord Server Icon Rail -->
+    <nav class="server-rail" aria-label="Servers">
+      <div class="server-icon active" title="Idol Avalon Studio">
+        <span class="server-pill"></span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+        </svg>
       </div>
-      <div class="title-block">
-        <h1>IDOL AVALON <span class="accent-badge">7P OFFICIAL RULES</span></h1>
-        <p class="subtitle">Gemini 4 Argon Showrunner • 6 Photorealistic K-Pop Idols • MC Jae-suk</p>
-      </div>
-    </div>
+      <div class="rail-divider"></div>
+      <button class="server-icon util-icon" data-preset="STANDARD" title="New Random Game (Quest 1)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+      </button>
+      <button class="server-icon util-icon" data-preset="QUEST_4_CRITICAL" title="Jump to Quest 4 Critical Scenario (2 Fails Required)">
+        <span class="rail-text-badge">Q4</span>
+      </button>
+      <button class="server-icon util-icon" data-preset="ASSASSIN_CLIMAX" title="Jump to Final Assassin Shot Scenario">
+        <span class="rail-text-badge">END</span>
+      </button>
+      <div class="rail-spacer"></div>
+      <button id="apiKeyModalBtn" class="server-icon util-icon" title="Gemini API Key &amp; Studio Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </nav>
 
-    <!-- 7-Player Avalon Quest Track (2 - 3 - 3 - 4* - 4) -->
-    <div class="avalon-board-strip">
-      <div class="board-section">
-        <span class="board-label">QUEST BOARD (7-PLAYER)</span>
-        <div id="questTrackContainer" class="quest-nodes"></div>
-      </div>
-      <div class="board-divider"></div>
-      <div class="board-section">
-        <span class="board-label">VOTE REJECT TRACK <span id="hammerWarningBadge" class="hammer-tag hidden">HAMMER!</span></span>
-        <div id="rejectTrackContainer" class="reject-nodes"></div>
-      </div>
-    </div>
-
-    <!-- Phase Clock & Controls -->
-    <div class="header-controls">
-      <div class="phase-clock-card" id="phaseClockCard">
-        <div class="phase-meta">
-          <span id="currentPhaseLabel" class="phase-name">TEAM PROPOSAL</span>
-          <span id="bystanderStatusBadge" class="bystander-pill hidden">👀 BYSTANDER MODE</span>
+    <!-- Left Discord Channel & Game State Sidebar -->
+    <aside class="channel-sidebar">
+      <header class="server-header">
+        <div class="server-name-wrap">
+          <span class="server-verified" title="Verified Gemini 4 Argon Server">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#23a55a">
+              <path d="M12 2L15 5H19V9L22 12L19 15V19H15L12 22L9 19H5V15L2 12L5 9V5H9L12 2Z" />
+              <polyline points="9 12 11 14 15 10" fill="none" stroke="#fff" stroke-width="2.2" />
+            </svg>
+          </span>
+          <h1 class="server-title">Idol Avalon Studio</h1>
         </div>
-        <div class="timer-display">
-          <span id="phaseTimerValue">00:20</span>
+      </header>
+
+      <div class="sidebar-scroll">
+        <!-- Voice Channel Section -->
+        <div class="channel-category">VOICE CHANNELS</div>
+        <div class="voice-channel-item active">
+          <svg class="ch-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+          <span class="ch-name">avalon-stage-7p</span>
+          <span class="ch-live-badge">LIVE</span>
         </div>
-      </div>
 
-      <div class="action-buttons-group">
-        <button id="audioToggleBtn" class="icon-btn active" title="Toggle Live Idol Voice TTS & Lyria Adaptive BGM">
-          🔊 Voice &amp; BGM: ON
-        </button>
-        <button id="judgeXrayToggleBtn" class="icon-btn xray-btn" title="Open Director X-Ray Inspector for Hackathon Judges">
-          🔬 Judge X-Ray
-        </button>
-        <button id="apiKeyModalBtn" class="icon-btn key-btn" title="Configure Gemini API Key & Photorealistic Media">
-          🔑 AI Studio / Key
-        </button>
-      </div>
-    </div>
-  </header>
+        <!-- Connected Voice Members List -->
+        <div class="voice-members-list" id="sidebarVoiceMembers"></div>
 
-  <!-- Main Broadcast Workspace -->
-  <main class="studio-workspace">
-    <!-- Left Column: MC Jae-suk Host Feed + Your Secret Role Card + Demo Controls -->
-    <aside class="left-studio-rail">
-      <!-- MC Jae-suk (유재석 Style Host) Tile -->
-      <section class="mc-host-card" id="mcHostTile">
-        <div class="mc-video-wrapper">
-          <canvas id="mcWebcamCanvas" width="420" height="240" class="webcam-canvas"></canvas>
-          <img id="mcPortraitImg" class="portrait-backing hidden" alt="MC Jae-suk" />
-          <div class="webcam-hud-top">
-            <span class="mc-tag">🎙️ HOST • MC JAE-SUK (유재석 VIBE)</span>
-            <span class="model-tag">gemini-4-argon</span>
+        <!-- Avalon Quest Board Widget -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>QUEST TRACK (7P)</span>
+            <span id="hammerWarningBadge" class="hammer-badge hidden">HAMMER</span>
           </div>
-          <div class="audio-waveform-bars" id="mcWaveform">
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
-        </div>
-        <div class="mc-cue-card">
-          <div class="cue-header">
-            <span class="cue-badge">NATIONAL MC CUE CARD</span>
-            <span id="mcThinkingBadge" class="thinking-pill">thinking: low</span>
-          </div>
-          <p id="mcSpeechText" class="mc-speech-text">
-            "Welcome to IDOL AVALON LIVE! Dealing 7 random secret roles now..."
-          </p>
-        </div>
-      </section>
+          <div id="questTrackContainer" class="quest-track-row"></div>
 
-      <!-- Human Player Secret Role & Night Vision Card -->
-      <section class="secret-role-card" id="secretRoleCard">
-        <div class="role-card-header">
-          <div>
-            <span class="section-eyebrow">YOUR SECRET ROLE (RANDOM DEALT)</span>
-            <h2 id="humanRoleTitle" class="role-title">Dealing Role...</h2>
+          <div class="sidebar-section-header" style="margin-top: 10px;">
+            <span>REJECT COUNT</span>
+            <span class="muted-label">5 = Evil Wins</span>
           </div>
-          <button id="toggleRoleMaskBtn" class="mini-btn" title="Hide/Show your secret role on screen">
-            👁️ Hide
-          </button>
+          <div id="rejectTrackContainer" class="reject-track-row"></div>
         </div>
-        <div id="roleCardBody" class="role-card-body">
-          <div id="humanAlignmentBadge" class="alignment-pill good">LOYAL SERVANT OF ARTHUR</div>
-          <p id="humanNightVisionText" class="night-vision-box">
-            Waiting for Night Phase vision...
-          </p>
-          <div class="rules-mini-reminder">
-            <strong>7P Rules:</strong> 4 Good (Merlin, Percival, 2 Citizens) vs 3 Evil (Assassin, Morgana, Oberon). Quest 4 needs <strong>2 Fails</strong>!
+
+        <!-- Secret Role Card -->
+        <div class="sidebar-section role-widget" id="secretRoleCard">
+          <div class="sidebar-section-header">
+            <span>YOUR SECRET ROLE</span>
+            <button id="toggleRoleMaskBtn" class="text-link-btn" type="button">Hide</button>
+          </div>
+          <div id="roleCardBody" class="role-widget-body">
+            <div class="role-top-line">
+              <span id="humanRoleTitle" class="role-name-text">Loading...</span>
+              <span id="humanAlignmentBadge" class="role-team-tag good">Good</span>
+            </div>
+            <p id="humanNightVisionText" class="role-vision-text">
+              Waiting for night phase vision...
+            </p>
           </div>
         </div>
-      </section>
 
-      <!-- New Game & Hackathon Judge Fast-Forward Scenarios -->
-      <section class="scenario-card">
-        <div class="scenario-header">
-          <span class="section-eyebrow">GAME &amp; JUDGE SCENARIOS (&lt;3 MIN DEMO)</span>
+        <!-- Quick Demo Presets -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>STAGE PRESETS</span>
+          </div>
+          <div class="preset-list">
+            <button class="preset-item scenario-btn" data-preset="STANDARD" type="button">
+              <span>Standard Game (Quest 1)</span>
+            </button>
+            <button class="preset-item scenario-btn" data-preset="QUEST_4_CRITICAL" type="button">
+              <span>Quest 4 Critical (2 Fails Req)</span>
+            </button>
+            <button class="preset-item scenario-btn" data-preset="ASSASSIN_CLIMAX" type="button">
+              <span>Final Assassin Shot</span>
+            </button>
+          </div>
         </div>
-        <div class="scenario-buttons">
-          <button class="scenario-btn primary" data-preset="STANDARD">
-            🎲 New Random Game (Quest 1)
-          </button>
-          <button class="scenario-btn" data-preset="QUEST_4_CRITICAL">
-            🔥 Jump to Quest 4 (2-Fails Req • 1-2 Score)
-          </button>
-          <button class="scenario-btn danger" data-preset="ASSASSIN_CLIMAX">
-            🗡️ Jump to Final Assassin Shot (Merlin Hunt)
-          </button>
+      </div>
+
+      <!-- Discord Voice Status & User Profile Bar -->
+      <div class="voice-connection-bar">
+        <div class="vc-status-left">
+          <div class="vc-signal-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#23a55a" stroke-width="2.5">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+            <span class="vc-connected-text">Voice Connected</span>
+          </div>
+          <span class="vc-subtext">avalon-stage-7p / Gemini 4 Argon</span>
         </div>
-      </section>
+      </div>
+
+      <div class="user-profile-bar">
+        <div class="user-avatar-wrap">
+          <div class="user-avatar-circle">G</div>
+          <span class="user-online-dot"></span>
+        </div>
+        <div class="user-meta">
+          <span class="user-display-name">Guest</span>
+          <span class="user-sub-status" id="userRoleSubStatus">In Voice Stage</span>
+        </div>
+      </div>
     </aside>
 
-    <!-- Center Column: 7-Tile Zoom Conference Grid + Interactive Phase Control Dock -->
-    <section class="center-zoom-stage">
-      <!-- Interactive Phase Banner (Context-sensitive controls for Proposal, Vote, Quest, Assassin) -->
-      <div id="phaseActionBanner" class="phase-action-banner">
-        <div class="banner-left">
-          <span id="bannerPhaseBadge" class="banner-badge">QUEST 1</span>
-          <span id="bannerInstructionText" class="banner-instruction">
-            Initializing 7-Player K-Pop Idol Zoom Call...
+    <!-- Center Discord Video Call Stage -->
+    <main class="video-call-stage">
+      <!-- Top Floating Meeting Pill + Context Action Bar -->
+      <div class="stage-top-bar">
+        <div class="meeting-info-pill" id="phaseClockCard">
+          <span class="meeting-channel-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#23a55a" stroke-width="2.2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
           </span>
+          <span id="bannerPhaseBadge" class="meeting-title">Quest 1</span>
+          <span class="pill-divider"></span>
+          <span id="currentPhaseLabel" class="meeting-phase-tag">TEAM PROPOSAL</span>
+          <span class="pill-divider"></span>
+          <span id="phaseTimerValue" class="meeting-timer">00:20</span>
+          <span class="pill-divider"></span>
+          <span class="meeting-participants" title="8 Participants (MC Jae-suk + 6 Idols + You)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>8</span>
+          </span>
+          <span id="bystanderStatusBadge" class="bystander-chip hidden">Bystander Mode</span>
         </div>
-        <div id="bannerActionControls" class="banner-controls"></div>
+
+        <!-- Context-Sensitive Game Action Bar -->
+        <div id="phaseActionBanner" class="context-action-bar">
+          <span id="bannerInstructionText" class="context-instruction">
+            Connecting to voice stage...
+          </span>
+          <div id="bannerActionControls" class="context-buttons"></div>
+        </div>
       </div>
 
-      <!-- 7-Tile Zoom Video Call Grid (6 Photorealistic AI Idols + 1 Human Guest Tile) -->
-      <div id="zoomGridContainer" class="zoom-grid">
+      <!-- 8-Tile 4x2 16:9 Video Grid (MC Jae-suk + 6 Idols + Guest) -->
+      <div id="zoomGridContainer" class="video-grid-8">
         <!-- Dynamically populated by app.js -->
       </div>
 
-      <!-- Bottom Live Voice & Chat Interrogation Bar -->
-      <div class="live-chat-dock">
-        <div class="mention-chips-row" id="mentionChipsRow">
-          <span class="chips-label">Target @Idol:</span>
-          <button class="mention-chip active" data-target="">All Table</button>
-          <button class="mention-chip" data-target="idol_wonyoung">@Wonyoung</button>
-          <button class="mention-chip" data-target="idol_karina">@Karina</button>
-          <button class="mention-chip" data-target="idol_sullyoon">@Sullyoon</button>
-          <button class="mention-chip" data-target="idol_yuna">@Yuna</button>
-          <button class="mention-chip" data-target="idol_chaewon">@Chaewon</button>
-          <button class="mention-chip" data-target="idol_hanni">@Hanni</button>
+      <!-- Bottom Floating Circular Call Controls (Matching Reference Design) -->
+      <div class="call-controls-dock">
+        <div class="call-buttons-group">
+          <button type="button" id="micPushToTalkBtn" class="call-circle-btn" title="Push to Talk (Speak via Microphone)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+            <span id="micBtnLabel" class="sr-only">Speak</span>
+          </button>
+
+          <button type="button" id="dockCamBtn" class="call-circle-btn" title="Toggle Your Webcam">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="23 7 16 12 23 17 23 7"></polygon>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            </svg>
+          </button>
+
+          <button type="button" id="audioToggleBtn" class="call-circle-btn active" title="Toggle Character Voice Audio (TTS)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+
+          <button type="button" id="nextAiBeatBtn" class="call-circle-btn" title="Stay Silent / Let Next Idol Speak">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19"></line>
+            </svg>
+          </button>
+
+          <button type="button" id="callVoteEarlyBtn" class="call-circle-btn" title="Call Team Vote Now">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 11 12 14 22 4"></polyline>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+          </button>
+
+          <button type="button" id="judgeXrayToggleBtn" class="call-circle-btn" title="Open Director X-Ray Telemetry">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+          </button>
+
+          <button type="button" id="toggleChatDrawerBtn" class="call-circle-btn active" title="Toggle Voice Chat Panel">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </button>
+
+          <button type="button" id="newGameHangupBtn" class="call-circle-btn hangup" title="New Random Game (Reset Stage)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path>
+              <line x1="23" y1="1" x2="1" y2="23"></line>
+            </svg>
+          </button>
         </div>
-
-        <form id="liveChatForm" class="chat-input-row">
-          <button type="button" id="micPushToTalkBtn" class="mic-btn" title="Speak in English or Korean via Microphone (gemini-3.5-transcribe-live / Web Speech)">
-            🎤 <span id="micBtnLabel">Speak Live</span>
-          </button>
-          <input
-            type="text"
-            id="humanChatInput"
-            class="chat-text-input"
-            placeholder="Type in English to question the idols, defend yourself, or stay silent to watch them lead the game..."
-            autocomplete="off"
-          />
-          <button type="submit" id="sendChatBtn" class="send-btn">
-            💬 Send to Zoom
-          </button>
-          <button type="button" id="nextAiBeatBtn" class="beat-btn" title="Let the AI idols continue debating while you stay silent (Bystander Mode)">
-            ⏭️ Stay Silent / Next Idol Turn
-          </button>
-          <button type="button" id="callVoteEarlyBtn" class="vote-now-btn" title="End discussion early and trigger the 7-player Team Vote">
-            🗳️ Call Vote Now
-          </button>
-        </form>
       </div>
-    </section>
+    </main>
 
-    <!-- Right Column: Live Transcript & Director X-Ray Telemetry Drawer -->
-    <aside class="right-telemetry-rail">
-      <div class="rail-tabs">
-        <button class="rail-tab active" data-tab="transcriptTab">
-          💬 Live Zoom Transcript
-        </button>
-        <button class="rail-tab" data-tab="xrayTab" id="xrayTabButton">
-          🔬 Director X-Ray (Judge)
-        </button>
-      </div>
+    <!-- Right Discord Voice Chat & Inspector Drawer -->
+    <aside class="chat-drawer" id="rightChatDrawer">
+      <header class="chat-drawer-header">
+        <div class="rail-tabs">
+          <button class="rail-tab active" data-tab="transcriptTab" type="button">
+            Voice Chat
+          </button>
+          <button class="rail-tab" data-tab="xrayTab" id="xrayTabButton" type="button">
+            Inspector (X-Ray)
+          </button>
+        </div>
+      </header>
 
-      <!-- Tab 1: Live Conversation & Verification Badges -->
+      <!-- Tab 1: Discord Voice Text Chat -->
       <div id="transcriptTab" class="rail-tab-content active">
-        <div id="transcriptList" class="transcript-list"></div>
+        <div id="transcriptList" class="discord-messages-list"></div>
+
+        <!-- Bottom Discord Message Input -->
+        <div class="discord-chat-composer">
+          <div class="mention-chips-row" id="mentionChipsRow">
+            <button type="button" class="mention-chip active" data-target="">All</button>
+            <button type="button" class="mention-chip" data-target="idol_wonyoung">@Wonyoung</button>
+            <button type="button" class="mention-chip" data-target="idol_karina">@Karina</button>
+            <button type="button" class="mention-chip" data-target="idol_sullyoon">@Sullyoon</button>
+            <button type="button" class="mention-chip" data-target="idol_yuna">@Yuna</button>
+            <button type="button" class="mention-chip" data-target="idol_chaewon">@Chaewon</button>
+            <button type="button" class="mention-chip" data-target="idol_hanni">@Hanni</button>
+          </div>
+
+          <form id="liveChatForm" class="discord-input-box">
+            <input
+              type="text"
+              id="humanChatInput"
+              class="discord-text-input"
+              placeholder="Message #avalon-stage-7p..."
+              autocomplete="off"
+            />
+            <button type="submit" id="sendChatBtn" class="discord-send-btn" title="Send Message">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+              </svg>
+            </button>
+          </form>
+        </div>
       </div>
 
-      <!-- Tab 2: Judge X-Ray (True Roles, Inner Monologues, Suspicion Matrix, Verification Loop) -->
+      <!-- Tab 2: Judge X-Ray Inspector -->
       <div id="xrayTab" class="rail-tab-content">
-        <div class="xray-section">
-          <div class="xray-header-row">
-            <h3>Autonomous Verification Loop</h3>
-            <span class="verified-pill">gemini-4-argon Guard</span>
+        <div class="xray-scroll-area">
+          <div class="xray-block">
+            <div class="xray-block-header">
+              <span>True Secret Roles</span>
+              <button id="revealTrueRolesBtn" class="text-link-btn" type="button">Show Spoilers</button>
+            </div>
+            <div id="trueRolesContainer" class="true-roles-grid blurred-spoilers"></div>
           </div>
-          <div id="verificationLogList" class="xray-log-list"></div>
-        </div>
 
-        <div class="xray-section">
-          <div class="xray-header-row">
-            <h3>Private Inner Monologue vs Public Speech</h3>
-            <span class="verified-pill">Epistemic Isolated</span>
+          <div class="xray-block">
+            <div class="xray-block-header">
+              <span>Private Inner Monologue vs Speech</span>
+              <span class="xray-tag">Epistemic</span>
+            </div>
+            <div id="innerMonologueList" class="xray-list"></div>
           </div>
-          <div id="innerMonologueList" class="xray-monologue-list"></div>
-        </div>
 
-        <div class="xray-section">
-          <div class="xray-header-row">
-            <h3>True Secret Roles (Spoiler Toggle)</h3>
-            <button id="revealTrueRolesBtn" class="mini-btn">Show Spoilers</button>
+          <div class="xray-block">
+            <div class="xray-block-header">
+              <span>Verification Guard Loop</span>
+              <span class="xray-tag">gemini-4-argon</span>
+            </div>
+            <div id="verificationLogList" class="xray-list"></div>
           </div>
-          <div id="trueRolesContainer" class="true-roles-grid blurred-spoilers"></div>
         </div>
       </div>
     </aside>
-  </main>
+  </div>
 
-  <!-- API Key & Multimodal Studio Modal -->
+  <!-- Settings & Gemini API Key Modal -->
   <div id="apiKeyModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>🔑 Gemini 4 Argon &amp; Photorealistic Idol Media Studio</h2>
-        <button id="closeModalBtn" class="mini-btn">✕ Close</button>
+        <h2>Stage Settings &amp; Gemini API Key</h2>
+        <button id="closeModalBtn" class="text-link-btn" type="button">Close</button>
       </div>
       <p class="modal-desc">
-        Enter your hackathon <code>GEMINI_API_KEY</code> to enable live <strong><code>gemini-4-argon</code></strong> Interactions API reasoning, <strong><code>gemini-nano-banana-2.1</code></strong> 4K idol portrait synthesis, <strong><code>gemini-omni-1.1-flash</code></strong> background video generation, and <strong><code>gemini-3.8-flash-tts</code></strong> voices.
+        Configure your <code>GEMINI_API_KEY</code> for live <code>gemini-4-argon</code> reasoning, <code>gemini-nano-banana-2.1</code> portrait generation, and <code>gemini-3.8-flash-tts</code> voices.
       </p>
       <div class="modal-form-group">
-        <label for="apiKeyInput">Gemini API Key (Stored only in memory / runtime session):</label>
+        <label for="apiKeyInput">Gemini API Key</label>
         <input type="password" id="apiKeyInput" class="modal-input" placeholder="AIzaSy..." />
       </div>
       <div class="modal-actions">
-        <button id="saveApiKeyBtn" class="scenario-btn primary">💾 Save API Key</button>
-        <button id="generatePortraitsBtn" class="scenario-btn">
-          📸 Generate 4K Idol Portraits (gemini-nano-banana-2.1)
+        <button id="saveApiKeyBtn" class="discord-btn primary" type="button">Save Key</button>
+        <button id="generatePortraitsBtn" class="discord-btn secondary" type="button">
+          Regenerate 4K Portraits
         </button>
       </div>
       <p id="modalStatusMsg" class="modal-status"></p>

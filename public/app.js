@@ -4,20 +4,23 @@
  */
 
 const PHOTOREALISTIC_PORTRAIT_ANCHORS = {
-  mc_jaesuk:
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=85',
-  idol_wonyoung:
-    'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?auto=format&fit=crop&w=800&q=85',
-  idol_karina:
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=85',
-  idol_sullyoon:
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=85',
-  idol_yuna:
-    'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=800&q=85',
-  idol_chaewon:
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=85',
-  idol_hanni:
-    'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=800&q=85'
+  mc_jaesuk: '/generated/portrait_mc_jaesuk.png',
+  idol_wonyoung: '/generated/portrait_idol_wonyoung.png',
+  idol_karina: '/generated/portrait_idol_karina.png',
+  idol_sullyoon: '/generated/portrait_idol_sullyoon.png',
+  idol_yuna: '/generated/portrait_idol_yuna.png',
+  idol_chaewon: '/generated/portrait_idol_chaewon.png',
+  idol_hanni: '/generated/portrait_idol_hanni.png'
+};
+
+const REAL_WEBCAM_VIDEO_URLS = {
+  mc_jaesuk: '/generated/webcam_mc_jaesuk.mp4',
+  idol_wonyoung: '/generated/webcam_idol_wonyoung.mp4',
+  idol_karina: '/generated/webcam_idol_karina.mp4',
+  idol_sullyoon: '/generated/webcam_idol_sullyoon.mp4',
+  idol_yuna: '/generated/webcam_idol_yuna.mp4',
+  idol_chaewon: '/generated/webcam_idol_chaewon.mp4',
+  idol_hanni: '/generated/webcam_idol_hanni.mp4'
 };
 
 /**
@@ -52,6 +55,8 @@ const state = {
   activeSpeechCharIndex: 0,
   activeTargetPlayerId: null,
   audioEnabled: true,
+  bgmAudioElement: null,
+  currentBgmMood: null,
   roleMasked: false,
   spoilersRevealed: false,
   localPhaseRemainingSec: 20,
@@ -86,13 +91,17 @@ async function startNewGame(demoPreset = 'STANDARD') {
   state.selectedProposalIds.clear();
   stopActiveSpeech();
 
+  const preferredRoleEl = document.getElementById('preferredRoleSelect');
+  const preferredRole = preferredRoleEl ? preferredRoleEl.value : 'RANDOM';
+
   try {
     const response = await fetch('/api/game/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         playerName: 'Guest',
-        demoPreset
+        demoPreset,
+        preferredRole
       })
     });
     const data = await response.json();
@@ -137,6 +146,7 @@ function applyServerGameState(data) {
 
   if (previousPhase !== state.board.phase) {
     resetPhaseClock(state.board.phaseTimerSec);
+    syncPhaseAdaptiveBgm(state.board.phase);
   }
 
   renderHeaderBoard();
@@ -383,15 +393,31 @@ function renderZoomGrid() {
   const board = state.board;
   const epistemic = state.humanPrivateView?.epistemicVision || {};
 
-  // Build or update tiles without destroying active canvas elements
+  // Build or update tiles without destroying active video/canvas elements
   if (container.children.length !== state.players.length) {
     container.innerHTML = state.players
-      .map(
-        (player) => `
+      .map((player) => {
+        const videoSrc = player.isHuman
+          ? ''
+          : player.lastVideoUrl || REAL_WEBCAM_VIDEO_URLS[player.id] || `/generated/webcam_${player.id}.mp4`;
+        const posterSrc = player.isHuman
+          ? ''
+          : PHOTOREALISTIC_PORTRAIT_ANCHORS[player.id] || `/generated/portrait_${player.id}.png`;
+        const videoClass = player.isHuman ? 'hidden' : 'webcam-video-feed';
+        return `
         <div class="zoom-tile" id="tile_${player.id}" data-player-id="${player.id}">
           <div class="tile-media-layer">
+            <video
+              id="video_${player.id}"
+              class="${videoClass}"
+              ${videoSrc ? `src="${videoSrc}"` : ''}
+              ${posterSrc ? `poster="${posterSrc}"` : ''}
+              autoplay
+              loop
+              muted
+              playsinline
+            ></video>
             <canvas id="canvas_${player.id}" width="360" height="240"></canvas>
-            <video id="video_${player.id}" class="hidden" autoplay loop muted playsinline></video>
           </div>
           <div class="tile-top-overlays">
             <div class="tile-badges-left" id="badges_left_${player.id}"></div>
@@ -402,7 +428,7 @@ function renderZoomGrid() {
             <div class="idol-name-cluster">
               <div class="idol-name">
                 <span>${player.name}</span>
-                ${player.isHuman ? '<button type="button" id="humanCamBtn" class="mini-btn" title="Toggle your real webcam on this Zoom tile">📷 Cam</button>' : ''}
+                ${player.isHuman ? '<button type="button" id="humanCamBtn" class="mini-btn" title="Toggle your real webcam on this Zoom tile">📷 Cam</button>' : '<span class="mini-btn" style="background:rgba(16,185,129,0.22);border-color:rgba(16,185,129,0.5);color:#6ee7b7;font-size:8.5px;padding:1px 5px;">LIVE MP4</span>'}
               </div>
               <div class="idol-archetype">${player.inspirationTag || player.archetype}</div>
             </div>
@@ -411,11 +437,24 @@ function renderZoomGrid() {
             </div>
           </div>
         </div>
-      `
-      )
+      `;
+      })
       .join('');
 
+    const mcVidEl = document.getElementById('mcWebcamVideo');
+    if (mcVidEl) {
+      mcVidEl.play().catch(() => {});
+      state.activeVideoStreams.set('mc_jaesuk', mcVidEl);
+    }
+
     state.players.forEach((player) => {
+      if (!player.isHuman) {
+        const vidEl = document.getElementById(`video_${player.id}`);
+        if (vidEl) {
+          vidEl.play().catch(() => {});
+          state.activeVideoStreams.set(player.id, vidEl);
+        }
+      }
       const tileEl = document.getElementById(`tile_${player.id}`);
       if (tileEl) {
         tileEl.addEventListener('click', (e) => {
@@ -1657,7 +1696,85 @@ async function toggleHumanWebcam() {
 }
 
 /**
- * Live Microphone Speech-to-Text (`Web Speech API` + `/api/media/transcribe` `gemini-3.5-transcribe-live`).
+ * Phase-Adaptive Background Music Loop Engine (`lyria-3-clip-preview` / `lyria-3.5`).
+ * Automatically fetches/generates and loops the phase soundtrack (`discussion`, `vote`, `quest`, `assassin`).
+ * @param {string} [phase='DISCUSSION']
+ * @param {boolean} [forceRegenerate=false]
+ */
+async function syncPhaseAdaptiveBgm(phase = 'DISCUSSION', forceRegenerate = false) {
+  const phaseToMood = {
+    TEAM_PROPOSAL: 'discussion',
+    DISCUSSION: 'discussion',
+    TEAM_VOTE: 'vote',
+    QUEST_EXECUTION: 'quest',
+    ASSASSIN_PHASE: 'assassin',
+    GAME_OVER: 'assassin'
+  };
+  const targetMood = phaseToMood[phase] || 'discussion';
+
+  if (!state.audioEnabled) {
+    if (state.bgmAudioElement) {
+      state.bgmAudioElement.pause();
+    }
+    return null;
+  }
+
+  if (!forceRegenerate && state.currentBgmMood === targetMood && state.bgmAudioElement) {
+    if (state.bgmAudioElement.paused) {
+      state.bgmAudioElement.play().catch(() => {});
+    }
+    return { mood: targetMood, bgmUrl: state.bgmAudioElement.src };
+  }
+
+  try {
+    const res = forceRegenerate
+      ? await fetch('/api/media/bgm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mood: targetMood, forceRegenerate: true })
+        })
+      : await fetch(`/api/media/bgm?mood=${encodeURIComponent(targetMood)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data?.bgmUrl) return null;
+
+    state.currentBgmMood = targetMood;
+    if (!state.bgmAudioElement) {
+      state.bgmAudioElement = new Audio();
+      state.bgmAudioElement.loop = true;
+      state.bgmAudioElement.volume = 0.16;
+    }
+    state.bgmAudioElement.src = `${data.bgmUrl}?t=${Date.now()}`;
+    if (state.audioEnabled) {
+      state.bgmAudioElement.play().catch(() => {});
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Helper to convert a recorded microphone `Blob` to a Base64 string.
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = String(reader.result || '');
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Live Microphone Speech-to-Text (`MediaRecorder` -> `POST /api/media/transcribe` `gemini-3.5-transcribe`
+ * + simultaneous `Web Speech API` interim preview). Supports both Korean and English speech.
  */
 function setupMicrophoneInput() {
   const micBtn = document.getElementById('micPushToTalkBtn');
@@ -1667,44 +1784,162 @@ function setupMicrophoneInput() {
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
-  let isListening = false;
+  let mediaRecorder = null;
+  let mediaStream = null;
+  let recordedChunks = [];
+  let isRecording = false;
+  let interimTranscript = '';
+  let autoStopTimer = null;
 
   if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    recognition.lang = navigator.language?.startsWith('ko') ? 'ko-KR' : 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
 
     recognition.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || '';
-      if (transcript) {
-        chatInput.value = transcript;
-        if (state.board?.phase === 'DISCUSSION') {
-          triggerDiscussionStep(transcript);
-          chatInput.value = '';
-        }
+      let combined = '';
+      for (let i = 0; i < event.results.length; i += 1) {
+        combined += event.results[i][0].transcript;
+      }
+      if (combined.trim()) {
+        interimTranscript = combined.trim();
+        chatInput.value = interimTranscript;
       }
     };
-
-    recognition.onend = () => {
-      isListening = false;
-      micBtn.classList.remove('recording');
-      micLabel.textContent = 'Speak Live';
-    };
+    recognition.onerror = () => {};
   }
 
-  micBtn.addEventListener('click', () => {
-    if (!recognition) {
+  const stopRecordingAndTranscribe = async () => {
+    if (!isRecording) return;
+    isRecording = false;
+    if (autoStopTimer) {
+      clearTimeout(autoStopTimer);
+      autoStopTimer = null;
+    }
+
+    micBtn.classList.remove('recording');
+    micLabel.textContent = '⏳ Transcribing...';
+
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        // Ignore if already stopped
+      }
+    }
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      await new Promise((resolve) => {
+        mediaRecorder.onstop = resolve;
+        try {
+          mediaRecorder.stop();
+        } catch {
+          resolve();
+        }
+      });
+    }
+
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      mediaStream = null;
+    }
+
+    let finalTranscript = '';
+    if (recordedChunks.length > 0) {
+      try {
+        const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(recordedChunks, { type: mimeType });
+        if (audioBlob.size > 400) {
+          const audioBase64 = await blobToBase64(audioBlob);
+          const res = await fetch('/api/media/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioBase64, mimeType })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.transcript) {
+              finalTranscript = String(data.transcript).trim();
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Server audio transcription fallback to Web Speech:', err);
+      }
+    }
+
+    const chosenText = finalTranscript || interimTranscript || chatInput.value.trim();
+    micLabel.textContent = 'Speak Live';
+
+    if (chosenText) {
+      chatInput.value = chosenText;
+      if (state.board?.phase === 'DISCUSSION') {
+        state.lastAutoBeatSec = state.discussionElapsedSec;
+        chatInput.value = '';
+        await triggerDiscussionStep(chosenText);
+      } else {
+        chatInput.focus();
+      }
+    }
+  };
+
+  micBtn.addEventListener('click', async () => {
+    if (isRecording) {
+      await stopRecordingAndTranscribe();
+      return;
+    }
+
+    interimTranscript = '';
+    recordedChunks = [];
+
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const preferredMime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/mp4')
+            ? 'audio/mp4'
+            : '';
+        mediaRecorder = preferredMime
+          ? new MediaRecorder(mediaStream, { mimeType: preferredMime })
+          : new MediaRecorder(mediaStream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            recordedChunks.push(e.data);
+          }
+        };
+        mediaRecorder.start(250);
+      }
+    } catch (err) {
+      console.warn('Microphone getUserMedia unavailable, using SpeechRecognition fallback:', err);
+    }
+
+    if (recognition) {
+      try {
+        recognition.start();
+      } catch {
+        // Ignore if already started
+      }
+    }
+
+    if (!mediaRecorder && !recognition) {
       chatInput.focus();
       return;
     }
-    if (isListening) {
-      recognition.stop();
-    } else {
-      isListening = true;
-      micBtn.classList.add('recording');
-      micLabel.textContent = 'Listening...';
-      recognition.start();
-    }
+
+    isRecording = true;
+    micBtn.classList.add('recording');
+    micLabel.textContent = '🔴 Stop & Send';
+    chatInput.placeholder = 'Listening via Microphone (Speak in Korean or English, then click Stop & Send)...';
+
+    // Auto-stop after 15 seconds if user forgets to click Stop
+    autoStopTimer = setTimeout(() => {
+      if (isRecording) {
+        stopRecordingAndTranscribe();
+      }
+    }, 15000);
   });
 }
 
@@ -1772,7 +2007,12 @@ function initApp() {
     state.audioEnabled = !state.audioEnabled;
     e.currentTarget.classList.toggle('active', state.audioEnabled);
     e.currentTarget.textContent = state.audioEnabled ? '🔊 Voice & BGM: ON' : '🔇 Voice & BGM: OFF';
-    if (!state.audioEnabled) stopActiveSpeech();
+    if (!state.audioEnabled) {
+      stopActiveSpeech();
+      if (state.bgmAudioElement) state.bgmAudioElement.pause();
+    } else {
+      syncPhaseAdaptiveBgm(state.board?.phase || 'DISCUSSION');
+    }
   });
 
   // Right Rail Tabs (Transcript vs Judge X-Ray)
@@ -1848,8 +2088,25 @@ function initApp() {
     }
   });
 
+  const lyriaBtn = document.getElementById('generateLyriaBgmBtn');
+  if (lyriaBtn) {
+    lyriaBtn.addEventListener('click', async () => {
+      const statusEl = document.getElementById('modalStatusMsg');
+      statusEl.textContent = '⏳ Generating Adaptive BGM Loop via lyria-3-clip-preview (Lyria 3.5)...';
+      try {
+        const result = await syncPhaseAdaptiveBgm(state.board?.phase || 'DISCUSSION', true);
+        statusEl.textContent = result?.bgmUrl
+          ? `✅ Generated & playing Lyria 3.5 BGM loop (${result.bgmUrl} via ${result.modelUsed})!`
+          : '⚠️ Could not generate Lyria BGM loop. Check API key status.';
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+  }
+
   // Start initial game automatically!
   startNewGame('STANDARD');
 }
 
 window.addEventListener('DOMContentLoaded', initApp);
+

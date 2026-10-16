@@ -28,8 +28,8 @@ All calls use `@google/genai` (`>= 2.3.0`) targeting the **Interactions API** (`
 | **Photorealistic Idol & MC Portraits** | `gemini-nano-banana-2.1` | `gemini-3.1-flash-lite-image` | N/A | Generates photorealistic K-Pop webcam portraits (`Wonyoung`, `Karina`, `Sullyoon`, `Yuna`, `Chaewon`, `Hanni`, `MC Jae-suk`) with studio lighting and emotional states. |
 | **Live Talking / Reaction Video Clips** | `gemini-omni-1.1-flash` | Canvas WebGL 2.5D Live Motion | N/A | Background-generates (`background: true`) short photorealistic video clips synchronized with idol speech/reactions. |
 | **Expressive Idol & MC Voice Synthesis** | `gemini-3.8-flash-tts` | `gemini-3.8-flash-lite-tts` | N/A | Synthesizes distinct English voices for MC Jae-suk and each of the 6 K-Pop idols. |
-| **Live Voice Input Transcription** | `gemini-3.5-transcribe-live` | Browser Web Speech / Audio Input | N/A | Transcribes the human player's microphone speech in real time. |
-| **Adaptive Variety / Mafia BGM Loops** | `lyria-3-clip-preview` | `lyria-3.5` / WebAudio Synth | N/A | Generates dynamic 30s background music loops for Discussion, Voting, and Assassin phases. |
+| **Live Voice Input Transcription** | `gemini-3.5-transcribe` | `gemini-3.5-transcribe-live` / `gemini-3.8-flash` / Web Speech | N/A | Captures real microphone audio via `MediaRecorder` (`audio/webm` / `audio/mp4`) and transcribes Korean or English speech into Avalon dialogue via `audioTranscription.text`. |
+| **Adaptive Variety / Mafia BGM Loops** | `lyria-3-clip-preview` | `lyria-3.5` | N/A | Generates and caches phase-adaptive 30s MP3 background music loops (`discussion`, `vote`, `quest`, `assassin`) via `@google/genai` `models.generateContent`. |
 
 ---
 
@@ -107,22 +107,23 @@ Submits or triggers the Leader's Quest Team proposal (`N` players according to `
 - If the Leader is the Human Player (or if the 20s Proposal Timer expired), validates the `N` player IDs (auto-completing if timed out) and transitions to `DISCUSSION` (`75s` timer).
 
 ### 4.4 `POST /api/game/:gameId/discuss/step`
-Advances one autonomous beat in the `DISCUSSION` phase (`75s` timer) OR processes a live Human chat/voice interruption.
+Executes a real-time **6-Agent Parallel Floor Evaluation & Negotiation** step during the `DISCUSSION` phase (`75s` timer) OR processes a live Human chat/voice interruption.
 - **Request Body**:
   ```json
   {
-    "humanMessage": "Wait Chaewon, why did you leave Karina off Quest 2?", // Optional: null when autonomous tick
+    "humanMessage": "Wait Chaewon, why did you leave Karina off Quest 2?", // Optional: null when autonomous beat
     "targetMemberId": "idol_chaewon", // Optional @mention
     "elapsedRoundSec": 38
   }
   ```
-- **Orchestration Pipeline**:
-  1. If `humanMessage` is present, appends it to the transcript and triggers `gemini-4-argon` (`thinking_level: "medium"`) to pick the addressed/most relevant AI idol to respond directly to the Human.
-  2. If `humanMessage` is omitted (autonomous tick), the **Floor Manager (`gemini-4-argon`)** checks `elapsedRoundSec` and `humanMessagesThisRound`. If the Human has been silent (`elapsedRoundSec >= 30 && humanMessagesThisRound === 0`), injects the `BYSTANDER_ALERT` so an idol or MC Jae-suk can organically react to the Human's silence while continuing the debate.
-  3. Runs the **Verification Loop** on the generated response:
-     - Checks epistemic compliance (no illegal role reveal) + rule accuracy.
-     - Self-heals if flagged.
-  4. Synthesizes voice (`gemini-3.8-flash-tts`) + triggers/attaches photorealistic expression & video clip (`gemini-omni-1.1-flash` / `gemini-nano-banana-2.1`).
+- **6-Agent Autonomous Orchestration Pipeline**:
+  1. **Parallel 6-NPC Evaluation (`Promise.all` across all 6 Idol Agents)**:
+     - Every AI Idol (`Wonyoung`, `Karina`, `Sullyoon`, `Yuna`, `Chaewon`, `Hanni`) independently evaluates the current board state and latest transcript using her isolated `PrivatePlayerView` (`role`, `epistemicVision`, `suspicionMatrix[idolId]`, and personal regional dialect/persona).
+     - Each agent returns `{ intent: "INTERRUPT" | "SPEAK" | "HOLD_SILENT", urgency: 0..100, yieldStyle: "YIELD_POLITELY" | "PUSH_THROUGH", innerThought, text }`.
+  2. **Floor Negotiation & Emergent Event Resolution**:
+     - **`COLLISION_YIELD` (Simultaneous Mic Clash & Yield)**: If two or more agents bid with high urgency (`>= 74`), both turn their mics on simultaneously. One agent delivers a brief cut-off/yielding line (`yieldTurn`) and yields the floor to the winning agent (`latestTurn`), returning both turns for sequential real-time voice playback.
+     - **`STRATEGIC_SILENCE` (Mind-Game Pause)**: If agents deliberately hold silence to conceal their role (e.g., Merlin hiding from the Assassin), their `HOLD_SILENT` badges and internal reasoning update live on the grid and Judge X-Ray panel, while MC Jae-suk or the highest-urgency challenger calls out the tension.
+     - **`DIRECT_SPEECH` / `INTERRUPT`**: The agent with the strongest strategic urgency takes the floor, runs through the **2-Stage Verification Loop** (`verifyAndHealUtterance`), and synthesizes character-specific speech via `gemini-3.8-flash-tts`.
 
 ### 4.5 `POST /api/game/:gameId/vote`
 Executes the simultaneous 7-player Team Vote (`APPROVE` vs `REJECT`).
@@ -142,8 +143,8 @@ Triggered when Good achieves 3 successful Quests.
 - If the Assassin is the Human Player, accepts `targetPlayerId` (or auto-targets if the 30s timer expires) and resolves the final winner.
 
 ### 4.8 Media & Asset Endpoints
-- `GET /api/media/portraits`: Returns or generates the photorealistic webcam portraits for MC Jae-suk and the 6 Idols via `gemini-nano-banana-2.1` (`gemini-3.1-flash-lite-image`), caching them in `/public/generated/` so repeat loads are instant.
-- `POST /api/media/tts`: On-demand or turn-attached voice synthesis via `gemini-3.8-flash-tts` (`gemini-3.8-flash-lite-tts`).
-- `POST /api/media/video`: Starts or polls a background `gemini-omni-1.1-flash` talking/reaction video clip (`background: true`).
-- `POST /api/media/transcribe`: Accepts base64 audio from the player's microphone and transcribes via `gemini-3.5-transcribe-live`.
-- `GET /api/media/bgm`: Generates or streams phase-adaptive background music loops via `lyria-3-clip-preview` (`lyria-3.5`).
+- `POST /api/media/portraits/generate`: Generates photorealistic webcam portraits for MC Jae-suk and the 6 Idols via `gemini-nano-banana-2.1` (`gemini-3.1-flash-lite-image`), caching them in `/public/generated/` so repeat loads are instant.
+- `GET /api/media/video/:taskId`: Polls a background `gemini-omni-1.1-flash` video task (`client.interactions.get(interaction.id)` -> `output_video.data` saved to `/public/generated/omni_*.mp4`).
+- `POST /api/media/transcribe`: Accepts base64 audio recorded from the player's microphone (`MediaRecorder`) and transcribes Korean/English speech via `gemini-3.5-transcribe` (`audioTranscription.text`) or `gemini-3.8-flash`.
+- `GET /api/media/bgm` & `POST /api/media/bgm`: Generates and caches phase-adaptive 30s MP3 background music loops (`discussion`, `vote`, `quest`, `assassin`) via `lyria-3-clip-preview` (`lyria-3.5`) saved to `/public/generated/bgm_<mood>.mp3`.
+

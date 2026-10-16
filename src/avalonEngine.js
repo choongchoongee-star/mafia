@@ -37,14 +37,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_wonyoung',
     name: 'Wonyoung',
     inspirationTag: 'Jang Won-young (IVE) Vibe — Visual Center',
-    archetype: 'The Charming Manipulator',
+    archetype: 'The "Lucky Vicky" Posh Manipulator',
+    dialectTag: '✨ Posh "Lucky Vicky" Princess',
+    yieldStyle: 'YIELD_POLITELY',
     personality:
-      'Ultra-poised, sweet, glamorous princess energy, articulate and persuasive. When Good, builds consensus effortlessly; when Evil (especially Morgana), smiles sweetly while framing innocent players and pocketing Percival.',
+      'Ultra-poised chaebol-heiress princess energy with unstoppable "Lucky Vicky" positive reframing. Articulate and persuasive: when Good, builds royal consensus; when Evil (especially Morgana), smiles sweetly while framing innocent players and pocketing Percival.',
     speechStyle:
-      'Polite, confident, effortlessly charming English with occasional cute variety show interjections ("Honestly, listen to me for a second~", "Wait, that makes zero sense right now!").',
+      'Ultra-posh, charming princess English with signature "Lucky Vicky" positive spin and Korean honorifics ("Excuse me, unnie? Being doubted right now is actually so lucky for me because the real Quest will prove me clean~✨", "Honestly oppa, listen to Wonyoung for one second~").',
     voiceName: 'Aoede',
-    pitchOffset: 1.12,
-    rateOffset: 1.02,
+    pitchOffset: 1.16,
+    rateOffset: 1.01,
     themeColor: '#ec4899',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a stunning 21-year-old Korean K-pop female idol resembling Jang Wonyoung, ultra-glamorous doll-like visual center, long glossy dark brown wavy hair, flawless dewy glass skin, pastel pink tweed stage-casual cardigan, sitting in a luxury K-pop agency studio with soft ring-light catchlights in eyes, realistic webcam framing, ultra-detailed skin texture, natural photography.',
@@ -59,14 +61,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_karina',
     name: 'Karina',
     inspirationTag: 'Karina (aespa) Vibe — Unreal AI-Visual Leader',
-    archetype: 'The Ice-Cold Detective',
+    archetype: 'The Ice-Cold Math Detective',
+    dialectTag: '🧊 Ice-Cold Prosecutor Math',
+    yieldStyle: 'PUSH_THROUGH',
     personality:
-      'Analytical, razor-sharp, tracks every Approve/Reject vote and mathematical constraint across rounds. Zero tolerance for sloppy logic and immediately calls out silent bystanders.',
+      'Analytical, razor-sharp, tracks every Approve/Reject vote and mathematical constraint across rounds. Zero tolerance for emotional fluff or sloppy logic and immediately calls out silent bystanders.',
     speechStyle:
-      'Crisp, direct, analytical English ("Look at the Quest 2 vote matrix.", "Why are you staying so quiet right now?").',
+      'Crisp, cold, surgical prosecutor English ("Stop deflecting. Check the Quest vote ratio.", "Mathematically, at least one of those two is Evil. Explain your vote right now.").',
     voiceName: 'Kore',
-    pitchOffset: 0.96,
-    rateOffset: 1.03,
+    pitchOffset: 0.92,
+    rateOffset: 1.04,
     themeColor: '#6366f1',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a breathtaking 23-year-old Korean K-pop female idol resembling Karina, sharp V-line jawline, striking feline eyes, long sleek jet-black hair, stylish black off-shoulder knit top, modern neon-accented K-pop rehearsal room background, realistic webcam perspective, 85mm lens realism.',
@@ -81,14 +85,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_sullyoon',
     name: 'Sullyoon',
     inspirationTag: 'Sullyoon (NMIXX) Vibe — Deer-Eyed Doll Visual',
-    archetype: 'The Quiet Sniper',
+    archetype: 'The Busan Satoori Sniper (부산 사투리 저격수)',
+    dialectTag: '🌊 Busan Satoori Sniper (경상도 사투리)',
+    yieldStyle: 'YIELD_POLITELY',
     personality:
-      'Soft-spoken and observant, never wastes words, but drops devastatingly accurate logical reads. Dangerous as Merlin because she blends in naturally; lethal as Assassin because she notices every verbal slip.',
+      'Looks like an innocent deer-eyed princess, stays strategically quiet to observe, then suddenly opens her mic with a thick, charming Busan / Gyeongsang-do Satoori drawl that drops devastatingly accurate logical bombshells. Dangerous as Merlin because she holds strategic silence until the exact right moment.',
     speechStyle:
-      'Calm, concise, surgical English ("Wait... if you trusted her, why did you reject her team?", "I noticed who defended whom on Quest 1.").',
+      'Thick, charming Busan Satoori (Gyeongsang-do dialect) mixed with expressive Southern drawl ("Aigoo, ma! Mwo-ra-ka-no (뭐라카노)? What in tarnation are y\'all talkin\' about right now?", "Wait a minute... ddaeng (땡)! If you trusted her, why did you reject her team, unnie? Jin-jja shady!").',
     voiceName: 'Leda',
-    pitchOffset: 1.06,
-    rateOffset: 0.98,
+    pitchOffset: 1.05,
+    rateOffset: 0.93,
     themeColor: '#a855f7',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a gorgeous 21-year-old Korean K-pop female idol resembling Sullyoon, large doe eyes, small doll-like face, soft dark chestnut wavy hair, cozy cream knit sweater in a professional vocal recording booth with acoustic panels, natural studio lighting, realistic webcam view.',
@@ -103,14 +109,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_yuna',
     name: 'Yuna',
     inspirationTag: 'Yuna (ITZY) Vibe — High-Teen Sunshine Visual',
-    archetype: 'The Bold Accuser',
+    archetype: 'The Chungcheong Sarcasm Teaser (충청도식 돌려까기)',
+    dialectTag: '🍑 Chungcheong Sarcasm (충청도 돌려까기)',
+    yieldStyle: 'YIELD_POLITELY',
     personality:
-      'High-energy, fearless, expressive maknae energy. Loves pressure-testing players with bold accusations to see who panics or over-defends their teammate.',
+      'Sly, playful maknae who uses laid-back Chungcheong-do style roundabout sarcasm ("돌려까기") to bait suspects into panicking or over-defending their Evil partner.',
     speechStyle:
-      'Energetic, dramatic, fast-paced English ("Hold on! Did everyone see her reaction just now?!", "I am 100% Good Citizen, test me on this quest!").',
+      'Laid-back, teasing Chungcheong-do roundabout sarcasm ("Oh sure~ geu-ryeo (그려)~ go right ahead and approve that team if y\'all want the kingdom to burn~ Real nice job~", "Aigoo~ look how hard she\'s defending her buddy right now, totally not suspicious at all~").',
     voiceName: 'Zephyr',
-    pitchOffset: 1.15,
-    rateOffset: 1.07,
+    pitchOffset: 1.20,
+    rateOffset: 0.97,
     themeColor: '#f43f5e',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a radiant 21-year-old Korean K-pop female idol resembling Shin Yuna, dazzling high-teen visual, bright expressive eyes and glowing smile, sleek high ponytail, trendy varsity-chic jacket in a bright K-pop dance studio with mirror in background, realistic live stream camera quality.',
@@ -125,14 +133,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_chaewon',
     name: 'Chaewon',
     inspirationTag: 'Kim Chae-won (LE SSERAFIM) Vibe — Chic Bob-Cut Leader',
-    archetype: 'The Fierce Strategist',
+    archetype: 'The Fierce Street-Boss Leader (걸크러시 리더)',
+    dialectTag: '🔥 Fierce Street-Boss (걸크러시 쎈언니)',
+    yieldStyle: 'PUSH_THROUGH',
     personality:
-      'Pragmatic, decisive, fiercely protective of clean quest teams. Refuses to let Evil stall the 5-vote Hammer track and demands accountability from every Leader.',
+      'Fiery, impatient, no-nonsense girl-crush leader. Cuts straight through excuses, refuses to yield the mic when she smells a lie, and demands immediate accountability from every Quest Leader.',
     speechStyle:
-      'Punchy, charismatic leader English ("We cannot let the reject track hit 4, wake up everyone!", "Explain your third pick right now or I am rejecting.").',
+      'Blunt, punchy, rapid-fire street-boss English ("Yo, cut the act! We cannot let the reject track hit 4, wake up everyone!", "Explain your third pick in 5 seconds or I\'m smashing REJECT right now, period.").',
     voiceName: 'Callirhoe',
-    pitchOffset: 1.02,
-    rateOffset: 1.05,
+    pitchOffset: 0.96,
+    rateOffset: 1.13,
     themeColor: '#10b981',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a charismatic 23-year-old Korean K-pop female idol resembling Kim Chaewon, iconic chic short dark bob haircut with wispy bangs, expressive fierce eyes, stylish charcoal blazer over white tee in a sleek entertainment lounge, realistic webcam lighting.',
@@ -147,14 +157,16 @@ export const IDOL_CAST_PROFILES = [
     id: 'idol_hanni',
     name: 'Hanni',
     inspirationTag: 'Hanni (NewJeans) Vibe — Witty All-Rounder',
-    archetype: 'The Intuitive Trap-Setter',
+    archetype: 'The Melbourne Aussie Trap-Setter (호주 슬랭 트랩 메이커)',
+    dialectTag: '🦘 Melbourne Aussie Slang (호주 사투리)',
+    yieldStyle: 'PUSH_THROUGH',
     personality:
-      'Witty, perceptive, and unpredictably clever. Sets conversational traps during discussion so Evil players contradict their own earlier vote logic.',
+      'Witty, perceptive, and unpredictably clever. Speaks with authentic Melbourne Australian slang and sets conversational traps during discussion so Evil players contradict their own earlier vote logic.',
     speechStyle:
-      'Natural, fluent, conversational English ("Wait a minute, that math isn\'t mathing!", "If Guest is staying silent, are we sure Guest isn\'t Oberon?").',
+      'Authentic Melbourne Aussie English dialect ("Oi mate, fair dinkum, that excuse is heaps dodgy!", "No worries unnie, that math isn\'t mathing at all—reckon you\'re hiding Morgana right now!").',
     voiceName: 'Autonoe',
-    pitchOffset: 1.09,
-    rateOffset: 1.04,
+    pitchOffset: 1.11,
+    rateOffset: 1.07,
     themeColor: '#06b6d4',
     visualPrompt:
       'Photorealistic 4K Zoom webcam portrait of a cute and expressive 20-year-old K-pop female idol resembling Hanni, bright round eyes, soft bangs with dark hair, trendy Y2K pastel zip hoodie with headphones around neck in a cozy idol dorm room, warm natural webcam look.',
@@ -277,7 +289,11 @@ export function cryptoShuffle(inputArray) {
  * @param {'STANDARD'|'QUEST_4_CRITICAL'|'ASSASSIN_CLIMAX'} [options.demoPreset='STANDARD']
  * @returns {object} Full server-side game state
  */
-export function createAvalonGame({ playerName = 'Guest', demoPreset = 'STANDARD' } = {}) {
+export function createAvalonGame({
+  playerName = 'Guest',
+  demoPreset = 'STANDARD',
+  preferredRole = 'RANDOM'
+} = {}) {
   const gameId = `avalon_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
 
   const humanProfile = {
@@ -298,7 +314,7 @@ export function createAvalonGame({ playerName = 'Guest', demoPreset = 'STANDARD'
       seatIndex: idx,
       isHuman: false,
       currentExpression: 'idle',
-      lastVideoUrl: null,
+      lastVideoUrl: `/generated/webcam_${idol.id}.mp4`,
       lastAudioBase64: null
     })),
     {
@@ -308,12 +324,29 @@ export function createAvalonGame({ playerName = 'Guest', demoPreset = 'STANDARD'
     }
   ];
 
-  // Strictly random role distribution every single game
-  const shuffledRoles = cryptoShuffle(AVALON_ROLES_7P);
+  // Role distribution: Random by default, or optional preferred role for the Human Guest + shuffled remaining 6 roles
   const roleAssignments = {};
-  allPlayers.forEach((player, index) => {
-    roleAssignments[player.id] = shuffledRoles[index];
-  });
+  const normalizedPref = String(preferredRole || 'RANDOM').toUpperCase();
+  const targetRoleId =
+    normalizedPref === 'LOYAL_SERVANT' ? 'LOYAL_SERVANT_1' : normalizedPref;
+  const preferredRoleObj = AVALON_ROLES_7P.find((r) => r.roleId === targetRoleId);
+
+  if (preferredRoleObj && normalizedPref !== 'RANDOM') {
+    roleAssignments.player_human = preferredRoleObj;
+    const remainingRoles = cryptoShuffle(
+      AVALON_ROLES_7P.filter((r) => r.roleId !== preferredRoleObj.roleId)
+    );
+    allPlayers
+      .filter((p) => !p.isHuman)
+      .forEach((player, idx) => {
+        roleAssignments[player.id] = remainingRoles[idx];
+      });
+  } else {
+    const shuffledRoles = cryptoShuffle(AVALON_ROLES_7P);
+    allPlayers.forEach((player, index) => {
+      roleAssignments[player.id] = shuffledRoles[index];
+    });
+  }
 
   // Initialize Bayesian Suspicion Matrix: suspicionMatrix[observerId][targetId] in [0.05, 0.95]
   const suspicionMatrix = {};
@@ -398,7 +431,9 @@ export function createAvalonGame({ playerName = 'Guest', demoPreset = 'STANDARD'
       lastSpokeAt: null,
       bystanderCalledOutThisRound: false
     },
-    speakerHistoryThisRound: []
+    speakerHistoryThisRound: [],
+    lastAgentBids: [],
+    lastFloorEvent: null
   };
 
   // Apply Judge Fast-Forward Preset if requested (for <3 minute live demo verification)
@@ -573,6 +608,8 @@ export function buildPrivatePlayerView(game, playerId) {
       id: player.id,
       name: player.name,
       archetype: player.archetype,
+      dialectTag: player.dialectTag || '',
+      yieldStyle: player.yieldStyle || 'YIELD_POLITELY',
       personality: player.personality,
       speechStyle: player.speechStyle,
       roleId: myRole.roleId,
@@ -649,6 +686,8 @@ export function getPublicBoardSummary(game) {
     quests: game.quests,
     voteHistory: game.voteHistory.slice(-8),
     questHistory: game.questHistory,
+    lastAgentBids: game.lastAgentBids || [],
+    lastFloorEvent: game.lastFloorEvent || null,
     humanStats: {
       ...game.humanStats,
       isSilentBystander: game.humanStats.messagesThisRound === 0 && elapsedSec >= 22
@@ -1007,6 +1046,7 @@ export function resolveAssassination(game, targetPlayerId, assassinReasoning = '
  * @returns {object} Stored transcript item
  */
 export function appendTranscriptItem(game, entry) {
+  const speakerObj = game.players.find((p) => p.id === entry.speakerId);
   const item = {
     id: `msg_${Date.now()}_${crypto.randomBytes(2).toString('hex')}`,
     timestamp: new Date().toISOString(),
@@ -1014,6 +1054,8 @@ export function appendTranscriptItem(game, entry) {
     phase: game.phase,
     speakerId: entry.speakerId,
     speakerName: getPlayerName(game, entry.speakerId),
+    dialectTag: entry.dialectTag || speakerObj?.dialectTag || null,
+    floorEventType: entry.floorEventType || null,
     text: entry.text,
     emotion: entry.emotion || 'speaking',
     innerThought: entry.innerThought || null,
@@ -1052,7 +1094,7 @@ export function appendTranscriptItem(game, entry) {
 
 /**
  * Builds the Director X-Ray / Judge Telemetry Snapshot showing true roles, Bayesian suspicion matrix,
- * inner monologues, and Verification Loop pass/self-heal logs.
+ * inner monologues, live 6-agent floor bids, and Verification Loop pass/self-heal logs.
  * @param {object} game
  * @returns {object}
  */
@@ -1061,12 +1103,15 @@ export function buildJudgeXraySnapshot(game) {
     trueRoles: game.players.map((p) => ({
       playerId: p.id,
       playerName: p.name,
+      dialectTag: p.dialectTag || null,
       isHuman: Boolean(p.isHuman),
       roleId: game.roleAssignments[p.id].roleId,
       roleName: game.roleAssignments[p.id].roleName,
       alignment: game.roleAssignments[p.id].alignment
     })),
     suspicionMatrix: game.suspicionMatrix,
+    lastAgentBids: game.lastAgentBids || [],
+    lastFloorEvent: game.lastFloorEvent || null,
     verificationLogs: game.verificationLogs.slice(-15),
     recentInnerMonologues: game.transcript
       .filter((t) => t.innerThought)

@@ -36,7 +36,8 @@ import {
   generateAssassinDecision,
   generatePhotorealisticPortrait,
   getVideoTaskStatus,
-  transcribePlayerAudio
+  transcribePlayerAudio,
+  generateAdaptiveBgmLoop
 } from './src/geminiOrchestrator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -114,12 +115,17 @@ app.post('/api/config/key', (req, res) => {
  */
 app.post('/api/game/new', async (req, res) => {
   try {
-    const { playerName = 'Guest', demoPreset = 'STANDARD', apiKey } = req.body || {};
+    const {
+      playerName = 'Guest',
+      demoPreset = 'STANDARD',
+      preferredRole = 'RANDOM',
+      apiKey
+    } = req.body || {};
     if (apiKey) {
       setRuntimeGeminiApiKey(apiKey);
     }
 
-    const game = createAvalonGame({ playerName, demoPreset });
+    const game = createAvalonGame({ playerName, demoPreset, preferredRole });
     activeGames.set(game.gameId, game);
 
     const mcOpeningTurn = await generateMcJaesukCommentary(game, 'GAME_START', {
@@ -251,12 +257,20 @@ app.post('/api/game/:gameId/discuss/step', async (req, res) => {
       elapsedRoundSec: Number(elapsedRoundSec) || 0
     });
 
+    let yieldStoredTurn = null;
+    if (aiDebateTurn.yieldTurn) {
+      yieldStoredTurn = appendTranscriptItem(game, aiDebateTurn.yieldTurn);
+    }
+
     const latestTurn = appendTranscriptItem(game, aiDebateTurn);
 
     return res.json(
       buildClientResponse(game, {
         humanTurn: humanStoredTurn,
-        latestTurn
+        yieldTurn: yieldStoredTurn,
+        latestTurn,
+        floorEvent: aiDebateTurn.floorEvent || null,
+        agentBids: aiDebateTurn.agentBids || []
       })
     );
   } catch (err) {
@@ -402,7 +416,7 @@ app.get('/api/media/video/:taskId', (req, res) => {
 });
 
 /**
- * Transcribes player microphone speech via `gemini-3.5-transcribe-live`.
+ * Transcribes player microphone speech via `gemini-3.5-transcribe`.
  */
 app.post('/api/media/transcribe', async (req, res) => {
   try {
@@ -411,6 +425,29 @@ app.post('/api/media/transcribe', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message || 'Transcription failed' });
+  }
+});
+
+/**
+ * Generates or returns phase-adaptive background music loops via `lyria-3-clip-preview` (`lyria-3.5`).
+ */
+app.get('/api/media/bgm', async (req, res) => {
+  try {
+    const mood = req.query.mood || 'discussion';
+    const result = await generateAdaptiveBgmLoop(mood, false);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Lyria BGM generation failed' });
+  }
+});
+
+app.post('/api/media/bgm', async (req, res) => {
+  try {
+    const { mood = 'discussion', forceRegenerate = false } = req.body || {};
+    const result = await generateAdaptiveBgmLoop(mood, Boolean(forceRegenerate));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Lyria BGM generation failed' });
   }
 });
 
