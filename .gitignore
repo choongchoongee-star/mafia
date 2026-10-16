@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.local
+public/generated/*.mp4
+public/generated/*.wav
+*.log
+.DS_Store

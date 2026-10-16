@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDOL AVALON LIVE — K-Pop Variety Show Social Deduction (Gemini 4 Argon)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- Top Broadcast Studio Header -->
+  <header class="broadcast-header">
+    <div class="brand-cluster">
+      <div class="live-pill">
+        <span class="live-dot"></span>
+        <span>LIVE ZOOM STUDIO</span>
+      </div>
+      <div class="title-block">
+        <h1>IDOL AVALON <span class="accent-badge">7P OFFICIAL RULES</span></h1>
+        <p class="subtitle">Gemini 4 Argon Showrunner • 6 Photorealistic K-Pop Idols • MC Jae-suk</p>
+      </div>
+    </div>
+
+    <!-- 7-Player Avalon Quest Track (2 - 3 - 3 - 4* - 4) -->
+    <div class="avalon-board-strip">
+      <div class="board-section">
+        <span class="board-label">QUEST BOARD (7-PLAYER)</span>
+        <div id="questTrackContainer" class="quest-nodes"></div>
+      </div>
+      <div class="board-divider"></div>
+      <div class="board-section">
+        <span class="board-label">VOTE REJECT TRACK <span id="hammerWarningBadge" class="hammer-tag hidden">HAMMER!</span></span>
+        <div id="rejectTrackContainer" class="reject-nodes"></div>
+      </div>
+    </div>
+
+    <!-- Phase Clock & Controls -->
+    <div class="header-controls">
+      <div class="phase-clock-card" id="phaseClockCard">
+        <div class="phase-meta">
+          <span id="currentPhaseLabel" class="phase-name">TEAM PROPOSAL</span>
+          <span id="bystanderStatusBadge" class="bystander-pill hidden">👀 BYSTANDER MODE</span>
+        </div>
+        <div class="timer-display">
+          <span id="phaseTimerValue">00:20</span>
+        </div>
+      </div>
+
+      <div class="action-buttons-group">
+        <button id="audioToggleBtn" class="icon-btn active" title="Toggle Live Idol Voice TTS & Lyria Adaptive BGM">
+          🔊 Voice &amp; BGM: ON
+        </button>
+        <button id="judgeXrayToggleBtn" class="icon-btn xray-btn" title="Open Director X-Ray Inspector for Hackathon Judges">
+          🔬 Judge X-Ray
+        </button>
+        <button id="apiKeyModalBtn" class="icon-btn key-btn" title="Configure Gemini API Key & Photorealistic Media">
+          🔑 AI Studio / Key
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Broadcast Workspace -->
+  <main class="studio-workspace">
+    <!-- Left Column: MC Jae-suk Host Feed + Your Secret Role Card + Demo Controls -->
+    <aside class="left-studio-rail">
+      <!-- MC Jae-suk (유재석 Style Host) Tile -->
+      <section class="mc-host-card" id="mcHostTile">
+        <div class="mc-video-wrapper">
+          <canvas id="mcWebcamCanvas" width="420" height="240" class="webcam-canvas"></canvas>
+          <img id="mcPortraitImg" class="portrait-backing hidden" alt="MC Jae-suk" />
+          <div class="webcam-hud-top">
+            <span class="mc-tag">🎙️ HOST • MC JAE-SUK (유재석 VIBE)</span>
+            <span class="model-tag">gemini-4-argon</span>
+          </div>
+          <div class="audio-waveform-bars" id="mcWaveform">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="mc-cue-card">
+          <div class="cue-header">
+            <span class="cue-badge">NATIONAL MC CUE CARD</span>
+            <span id="mcThinkingBadge" class="thinking-pill">thinking: low</span>
+          </div>
+          <p id="mcSpeechText" class="mc-speech-text">
+            "Welcome to IDOL AVALON LIVE! Dealing 7 random secret roles now..."
+          </p>
+        </div>
+      </section>
+
+      <!-- Human Player Secret Role & Night Vision Card -->
+      <section class="secret-role-card" id="secretRoleCard">
+        <div class="role-card-header">
+          <div>
+            <span class="section-eyebrow">YOUR SECRET ROLE (RANDOM DEALT)</span>
+            <h2 id="humanRoleTitle" class="role-title">Dealing Role...</h2>
+          </div>
+          <button id="toggleRoleMaskBtn" class="mini-btn" title="Hide/Show your secret role on screen">
+            👁️ Hide
+          </button>
+        </div>
+        <div id="roleCardBody" class="role-card-body">
+          <div id="humanAlignmentBadge" class="alignment-pill good">LOYAL SERVANT OF ARTHUR</div>
+          <p id="humanNightVisionText" class="night-vision-box">
+            Waiting for Night Phase vision...
+          </p>
+          <div class="rules-mini-reminder">
+            <strong>7P Rules:</strong> 4 Good (Merlin, Percival, 2 Citizens) vs 3 Evil (Assassin, Morgana, Oberon). Quest 4 needs <strong>2 Fails</strong>!
+          </div>
+        </div>
+      </section>
+
+      <!-- New Game & Hackathon Judge Fast-Forward Scenarios -->
+      <section class="scenario-card">
+        <div class="scenario-header">
+          <span class="section-eyebrow">GAME &amp; JUDGE SCENARIOS (&lt;3 MIN DEMO)</span>
+        </div>
+        <div class="scenario-buttons">
+          <button class="scenario-btn primary" data-preset="STANDARD">
+            🎲 New Random Game (Quest 1)
+          </button>
+          <button class="scenario-btn" data-preset="QUEST_4_CRITICAL">
+            🔥 Jump to Quest 4 (2-Fails Req • 1-2 Score)
+          </button>
+          <button class="scenario-btn danger" data-preset="ASSASSIN_CLIMAX">
+            🗡️ Jump to Final Assassin Shot (Merlin Hunt)
+          </button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- Center Column: 7-Tile Zoom Conference Grid + Interactive Phase Control Dock -->
+    <section class="center-zoom-stage">
+      <!-- Interactive Phase Banner (Context-sensitive controls for Proposal, Vote, Quest, Assassin) -->
+      <div id="phaseActionBanner" class="phase-action-banner">
+        <div class="banner-left">
+          <span id="bannerPhaseBadge" class="banner-badge">QUEST 1</span>
+          <span id="bannerInstructionText" class="banner-instruction">
+            Initializing 7-Player K-Pop Idol Zoom Call...
+          </span>
+        </div>
+        <div id="bannerActionControls" class="banner-controls"></div>
+      </div>
+
+      <!-- 7-Tile Zoom Video Call Grid (6 Photorealistic AI Idols + 1 Human Guest Tile) -->
+      <div id="zoomGridContainer" class="zoom-grid">
+        <!-- Dynamically populated by app.js -->
+      </div>
+
+      <!-- Bottom Live Voice & Chat Interrogation Bar -->
+      <div class="live-chat-dock">
+        <div class="mention-chips-row" id="mentionChipsRow">
+          <span class="chips-label">Target @Idol:</span>
+          <button class="mention-chip active" data-target="">All Table</button>
+          <button class="mention-chip" data-target="idol_wonyoung">@Wonyoung</button>
+          <button class="mention-chip" data-target="idol_karina">@Karina</button>
+          <button class="mention-chip" data-target="idol_sullyoon">@Sullyoon</button>
+          <button class="mention-chip" data-target="idol_yuna">@Yuna</button>
+          <button class="mention-chip" data-target="idol_chaewon">@Chaewon</button>
+          <button class="mention-chip" data-target="idol_hanni">@Hanni</button>
+        </div>
+
+        <form id="liveChatForm" class="chat-input-row">
+          <button type="button" id="micPushToTalkBtn" class="mic-btn" title="Speak in English or Korean via Microphone (gemini-3.5-transcribe-live / Web Speech)">
+            🎤 <span id="micBtnLabel">Speak Live</span>
+          </button>
+          <input
+            type="text"
+            id="humanChatInput"
+            class="chat-text-input"
+            placeholder="Type in English to question the idols, defend yourself, or stay silent to watch them lead the game..."
+            autocomplete="off"
+          />
+          <button type="submit" id="sendChatBtn" class="send-btn">
+            💬 Send to Zoom
+          </button>
+          <button type="button" id="nextAiBeatBtn" class="beat-btn" title="Let the AI idols continue debating while you stay silent (Bystander Mode)">
+            ⏭️ Stay Silent / Next Idol Turn
+          </button>
+          <button type="button" id="callVoteEarlyBtn" class="vote-now-btn" title="End discussion early and trigger the 7-player Team Vote">
+            🗳️ Call Vote Now
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Right Column: Live Transcript & Director X-Ray Telemetry Drawer -->
+    <aside class="right-telemetry-rail">
+      <div class="rail-tabs">
+        <button class="rail-tab active" data-tab="transcriptTab">
+          💬 Live Zoom Transcript
+        </button>
+        <button class="rail-tab" data-tab="xrayTab" id="xrayTabButton">
+          🔬 Director X-Ray (Judge)
+        </button>
+      </div>
+
+      <!-- Tab 1: Live Conversation & Verification Badges -->
+      <div id="transcriptTab" class="rail-tab-content active">
+        <div id="transcriptList" class="transcript-list"></div>
+      </div>
+
+      <!-- Tab 2: Judge X-Ray (True Roles, Inner Monologues, Suspicion Matrix, Verification Loop) -->
+      <div id="xrayTab" class="rail-tab-content">
+        <div class="xray-section">
+          <div class="xray-header-row">
+            <h3>Autonomous Verification Loop</h3>
+            <span class="verified-pill">gemini-4-argon Guard</span>
+          </div>
+          <div id="verificationLogList" class="xray-log-list"></div>
+        </div>
+
+        <div class="xray-section">
+          <div class="xray-header-row">
+            <h3>Private Inner Monologue vs Public Speech</h3>
+            <span class="verified-pill">Epistemic Isolated</span>
+          </div>
+          <div id="innerMonologueList" class="xray-monologue-list"></div>
+        </div>
+
+        <div class="xray-section">
+          <div class="xray-header-row">
+            <h3>True Secret Roles (Spoiler Toggle)</h3>
+            <button id="revealTrueRolesBtn" class="mini-btn">Show Spoilers</button>
+          </div>
+          <div id="trueRolesContainer" class="true-roles-grid blurred-spoilers"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- API Key & Multimodal Studio Modal -->
+  <div id="apiKeyModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>🔑 Gemini 4 Argon &amp; Photorealistic Idol Media Studio</h2>
+        <button id="closeModalBtn" class="mini-btn">✕ Close</button>
+      </div>
+      <p class="modal-desc">
+        Enter your hackathon <code>GEMINI_API_KEY</code> to enable live <strong><code>gemini-4-argon</code></strong> Interactions API reasoning, <strong><code>gemini-nano-banana-2.1</code></strong> 4K idol portrait synthesis, <strong><code>gemini-omni-1.1-flash</code></strong> background video generation, and <strong><code>gemini-3.8-flash-tts</code></strong> voices.
+      </p>
+      <div class="modal-form-group">
+        <label for="apiKeyInput">Gemini API Key (Stored only in memory / runtime session):</label>
+        <input type="password" id="apiKeyInput" class="modal-input" placeholder="AIzaSy..." />
+      </div>
+      <div class="modal-actions">
+        <button id="saveApiKeyBtn" class="scenario-btn primary">💾 Save API Key</button>
+        <button id="generatePortraitsBtn" class="scenario-btn">
+          📸 Generate 4K Idol Portraits (gemini-nano-banana-2.1)
+        </button>
+      </div>
+      <p id="modalStatusMsg" class="modal-status"></p>
+    </div>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

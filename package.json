@@ -1,0 +1,21 @@
+{
+  "name": "idol-avalon-gemini-4-argon",
+  "version": "1.0.0",
+  "description": "Track 1 Entertainment: IDOL AVALON — 7-Player K-Pop Variety Show Social Deduction powered by Gemini 4 Argon",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check src/avalonEngine.js && node --check src/geminiOrchestrator.js && node --check public/app.js"
+  },
+  "dependencies": {
+    "@google/genai": "latest",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
