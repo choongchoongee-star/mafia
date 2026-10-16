@@ -172,6 +172,10 @@ Every AI Idol turn passes through a **2-Stage Verification Loop** before reachin
      - Supports **Fast Text-Only Mode (`skipTts`)**: toggling `Audio OFF` (`#audioToggleBtn`) bypasses server-side TTS/video synthesis so players can test and play at high speed via text chat alone.
 3. **Judge / Director X-Ray Tab (Toggleable via `X-Ray` Pill Button)**:
    - Displays live **`gemini-4-argon` (`thinking_level`)** reasoning traces, the hidden **Bayesian Suspicion Matrix**, each AI idol's **Private Inner Monologue** vs **Public Speech**, and **Verification Loop Pass/Self-Heal Logs** so judges can verify in < 3 minutes that all 6 AI idols are running genuine, deep multi-agent social deduction.
+4. **Responsive Mobile & Tablet Layout (`@media (max-width: 960px)`)**:
+   - **Touch Scrolling Unlocked**: Replaces the desktop `overflow: hidden` 4-column grid with a smooth vertical single-column flex layout (`overflow-y: auto; -webkit-overflow-scrolling: touch;`) so mobile viewports (`360px–960px`) never clip the video stage or chat off-screen.
+   - **Mobile-First Visual Priority (`order`)**: Places the **Sticky Mobile Top Bar + Quick-Jump Pills (`🎥 Stage`, `💬 Chat`, `🔍 X-Ray`, `🎲 Role/Setup`)** first, the **8-Tile `2×4` Video Stage + Phase Action Bar + Call Controls** second, the **Live Voice Chat & Judge X-Ray Panel** third, and the **Quest Track & Role / New Game Setup** fourth.
+   - **Mobile Touch Ergonomics**: Enforces `aspect-ratio: 16 / 10` on mobile `.zoom-tile` cards so `<canvas>` portraits remain sharp, disables the desktop horizontal splitter (`#chatResizeHandle`) on mobile screens, and uses `16px` font sizing on mobile inputs/dropdowns to prevent iOS Safari auto-zooming.
 
 ---
 

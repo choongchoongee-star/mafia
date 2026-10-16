@@ -815,6 +815,23 @@ function renderTranscriptAndXray() {
       )
       .join('');
   }
+
+  const namuwikiCastContainer = document.getElementById('namuwikiCastContainer');
+  if (namuwikiCastContainer) {
+    namuwikiCastContainer.innerHTML = (state.players || [])
+      .filter((p) => !p.isHuman && p.namuwikiProfile)
+      .map(
+        (p) => `
+        <div class="xray-card" style="border-left: 3px solid ${p.avatarColor || '#ec4899'};">
+          <div><strong>${p.name} (${p.koreanName || ''})</strong> <span class="msg-meta">${p.dialectTag || ''} • ${p.namuwikiProfile.mbti || ''}</span></div>
+          <div class="xray-thought">별명: ${(p.namuwikiProfile.nicknames || []).join(', ')}</div>
+          <div class="msg-text" style="font-size:11px; margin-top:2px;">최애 음식: ${(p.namuwikiProfile.favoriteFoods || []).join(', ')}</div>
+          <div class="msg-text" style="font-size:11px; color:#94a3b8; margin-top:2px;">특징: ${p.namuwikiProfile.iconicHabits || ''}</div>
+        </div>
+      `
+      )
+      .join('');
+  }
 }
 
 /**
@@ -1270,7 +1287,7 @@ function drawPhotorealisticWebcamTile(canvas, { id, isSpeaking, isHuman }) {
     }
 
     // 100% fixed static center crop — zero motion
-    const fixedScale = 1.15;
+    const fixedScale = 1.03;
     const scaledW = drawW * fixedScale;
     const scaledH = drawH * fixedScale;
 
@@ -1402,6 +1419,11 @@ function setupChatDrawerResizer() {
   let isDragging = false;
 
   const applyChatDrawerWidth = (requestedWidth) => {
+    if (window.innerWidth <= 960) {
+      appEl.style.removeProperty('--chat-drawer-width');
+      stageEl?.classList.remove('compact-stage');
+      return;
+    }
     const maxChatWidth = Math.max(
       MIN_CHAT_DRAWER_PX,
       window.innerWidth - LEFT_FIXED_SIDEBAR_PX - MIN_VIDEO_STAGE_PX
@@ -1631,12 +1653,42 @@ function initApp() {
     await triggerDiscussionStep(text);
   });
 
+  const scrollToMobileSection = (elementId) => {
+    if (window.innerWidth > 960) return;
+    const targetEl = document.getElementById(elementId);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  // Mobile Quick-Jump Navigation Pills (Stage / Chat / X-Ray / Role & Setup)
+  document.querySelectorAll('.mobile-nav-pill[data-mobile-jump]').forEach((pillBtn) => {
+    pillBtn.addEventListener('click', () => {
+      document.querySelectorAll('.mobile-nav-pill').forEach((b) => b.classList.remove('active'));
+      pillBtn.classList.add('active');
+
+      const targetId = pillBtn.dataset.mobileJump;
+      const targetTab = pillBtn.dataset.mobileTab;
+      if (targetTab) {
+        const appEl = document.getElementById('discordApp');
+        appEl?.classList.remove('chat-collapsed');
+        document.getElementById('toggleChatDrawerBtn')?.classList.add('active');
+        const tabTrigger = document.querySelector(`.rail-tab[data-tab="${targetTab}"]`);
+        tabTrigger?.click();
+      }
+      if (targetId) {
+        scrollToMobileSection(targetId);
+      }
+    });
+  });
+
   // Zone 1: Left Sidebar — Primary "Start New Game (Quest 1)" Button
   document.getElementById('startNewGamePrimaryBtn')?.addEventListener('click', () => {
     const selectedRole =
       document.getElementById('preferredRoleSelect')?.value || state.preferredRole || 'RANDOM';
     state.preferredRole = selectedRole;
     startNewGame('STANDARD', selectedRole);
+    scrollToMobileSection('mainVideoStage');
   });
 
   // Zone 1: Left Sidebar — Role Selector Dropdown
@@ -1644,12 +1696,14 @@ function initApp() {
     const selectedRole = e.target.value || 'RANDOM';
     state.preferredRole = selectedRole;
     startNewGame('STANDARD', selectedRole);
+    scrollToMobileSection('mainVideoStage');
   });
 
   // Zone 1: Left Sidebar — Demo Scenario Jump Buttons (Quest 4 Crisis / Final Assassin)
   document.querySelectorAll('[data-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
       startNewGame(btn.dataset.preset, state.preferredRole);
+      scrollToMobileSection('mainVideoStage');
     });
   });
 
@@ -1688,12 +1742,19 @@ function initApp() {
     appEl?.classList.remove('chat-collapsed');
     document.getElementById('toggleChatDrawerBtn')?.classList.add('active');
     document.getElementById('xrayTabButton')?.click();
+    scrollToMobileSection('rightChatDrawer');
   });
 
   // Zone 3: Bottom Dock — Toggle Right Side Panel (Voice Chat / Inspector)
   document.getElementById('toggleChatDrawerBtn')?.addEventListener('click', (e) => {
     const appEl = document.getElementById('discordApp');
     if (!appEl) return;
+    if (window.innerWidth <= 960) {
+      appEl.classList.remove('chat-collapsed');
+      e.currentTarget.classList.add('active');
+      scrollToMobileSection('rightChatDrawer');
+      return;
+    }
     const isCollapsed = appEl.classList.toggle('chat-collapsed');
     e.currentTarget.classList.toggle('active', !isCollapsed);
   });
