@@ -19,7 +19,21 @@
 
 ## 2. English Project Description (Copy-Paste Ready for Cerebral Valley Form)
 
-### 2.1 Core Purpose: Solving the "Headcount Bottleneck" of Mafia & Social Deduction Games
+### ⚡ Concise 10-Line Summary (Recommended for Main Submission Box)
+```text
+Social deduction party games like Mafia and The Resistance: Avalon are thrilling, but suffer from a critical headcount bottleneck: you cannot play unless 7 to 10 friends gather in a voice channel at the exact same time.
+IDOL AVALON LIVE solves this cold-start problem with Gemini 4 Argon (gemini-4-argon), turning 7-player Avalon into an on-demand Discord Voice & Video Party Stage (#avalon-stage-7p) where 1 human joins moderator MC Jae-ho and 6 autonomous AI K-Pop idols (Seoyoung, Rina, Seol-ah, Yura, Chaerin, and Hana).
+Every match cryptographically shuffles the official 7-player Avalon roles (Merlin, Percival, 2 Loyal Servants, Assassin, Morgana, Oberon) under strict Epistemic Isolation (buildPrivatePlayerView)—no AI agent ever sees the global role state, forcing genuine Bayesian deduction, bluffing, and role-shielding.
+Powered by the @google/genai Interactions API, gemini-4-argon routes reasoning dynamically across thinking_level: "high" (Leader Quest proposals, Evil sabotage, and the Assassin's final Merlin shot), "medium" (dual-channel privateInnerThought vs. publicSpeech), and "low" (MC hosting) with zero legacy sampling parameters.
+All 6 AI idols evaluate the board in parallel (Promise.all via gemini-3.8-flash) to bid for the voice floor and cast simultaneous APPROVE/REJECT team votes without scripted turn orders.
+Before any line reaches TTS, our Closed-Loop Epistemic & Rule Verifier (verifyAndHealUtterance on gemini-4-argon) audits the output for illegal role leaks (e.g., Merlin self-revealing) or rule hallucinations and self-heals violations in-character, exposed live in the Judge X-Ray Inspector.
+A 7-model multimodal pipeline brings the Discord call to life: 4K studio portraits (gemini-nano-banana-2.1), zero-cutoff Web Audio voice synthesis with lookahead pre-fetching (gemini-3.8-flash-tts), bilingual mic transcription (gemini-3.5-transcribe), seamless circular-crossfaded BGM (lyria-3-clip-preview), and async video clips (gemini-omni-1.1-flash).
+During the sprint, benchmarking gemini-omni-1.1-flash revealed that turn-by-turn video latency slowed rapid cross-examination, leading to our hybrid architecture of fixed 4K studio portraits + real-time voice waveforms + lookahead audio queuing for sub-second (~700ms) debate handoffs.
+Players can interact via 1-click Stage HUD buttons, live voice microphone, or natural Korean/English chat commands—or stay muted as a bystander while the Bystander Silence Detector prompts the idols to interrogate the player and autonomously play the game to completion.
+Deployed live on Google Cloud Run with desktop and mobile support, IDOL AVALON LIVE lays the foundation for hybrid Discord lobbies (N Humans + (7 - N) AI agents) where any small friend group can fill missing party seats with autonomous AI personas on demand.
+```
+
+### 2.1 Detailed Version: Solving the "Headcount Bottleneck" of Mafia & Social Deduction Games
 Social deduction games like *Mafia*, *Werewolf*, and *The Resistance: Avalon* are among the most thrilling party games ever created, but they suffer from a fundamental **cold-start headcount barrier**: you cannot play unless you gather **7 to 10 live people** in a Discord voice call at the exact same time. Traditional rule-based game bots fail to fill these seats because social deduction requires open-ended natural language bluffing, reading behavioral contradictions, and reasoning strictly under asymmetric hidden information.
 
 **IDOL AVALON LIVE** solves this headcount barrier using **Gemini 4 Argon (`gemini-4-argon`)**, transforming the classic 7-player hidden-role board game *The Resistance: Avalon* into an instant, on-demand **Discord Party Play (`#avalon-stage-7p` Voice & Video Stage)** experience where **1 Human Player** joins **6 autonomous AI K-Pop Visual Center Idols** (**Seoyoung `서영`, Rina `리나`, Seol-ah `설아`, Yura `유라`, Chaerin `채린`, and Hana `하나`**—each with pre-generated 4K studio portraits, distinct regional speaking styles such as Busan Satoori, Chungcheong Sarcasm, and Melbourne Aussie Slang, and rich Namuwiki-inspired profiles) alongside non-playing party moderator **MC Jae-ho (`유재호`)**.
